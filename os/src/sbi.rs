@@ -4,18 +4,20 @@ use core::arch::asm;
 
 const SBI_CONSOLE_PUTCHAR: usize = 1;
 
+// https://docs.rs/rustsbi/latest/rustsbi/#call-sbi-in-different-programming-languages
+// riscv-sbi Ch5.2 Extension: Console Putchar (EID #0x01)
 /// general sbi call
 #[inline(always)]
 fn sbi_call(which: usize, arg0: usize, arg1: usize, arg2: usize) -> usize {
     let mut ret;
     unsafe {
         asm!(
-            "li x16, 0",
+            "li a6, 0",
             "ecall",
-            inlateout("x10") arg0 => ret,
-            in("x11") arg1,
-            in("x12") arg2,
-            in("x17") which,
+            inlateout("a0") arg0 => ret,
+            in("a1") arg1,
+            in("a2") arg2,
+            in("a7") which,
         );
     }
     ret
