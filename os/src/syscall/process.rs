@@ -2,8 +2,7 @@
 use crate::{
     config::MAX_SYSCALL_NUM,
     task::{
-        exit_current_and_run_next, suspend_current_and_run_next, TaskManager, TaskStatus,
-        TASK_MANAGER,
+        current_task_info, exit_current_and_run_next, suspend_current_and_run_next, TaskStatus,
     },
     timer::get_time_us,
 };
@@ -25,13 +24,6 @@ pub struct TaskInfo {
     syscall_times: [u32; MAX_SYSCALL_NUM],
     /// Total running time of task
     time: usize,
-}
-
-impl TaskManager {
-    /// Get current task info
-    pub fn current_task_info(&self) -> TaskInfo {
-        todo!()
-    }
 }
 
 /// task exits and submit an exit code
@@ -64,6 +56,14 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
 /// get current task info
 pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
     trace!("kernel: sys_task_info");
-    unsafe { ti.write(TASK_MANAGER.current_task_info()) }
+    let (status, info) = current_task_info();
+    let (syscall_times, time) = { (info.syscall_times, info.running_times.real_time_us) };
+    unsafe {
+        *ti = TaskInfo {
+            status,
+            syscall_times,
+            time,
+        };
+    }
     0
 }

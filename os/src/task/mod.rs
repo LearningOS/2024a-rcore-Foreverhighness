@@ -19,6 +19,7 @@ use crate::loader::{get_num_app, init_app_cx};
 use crate::sync::UPSafeCell;
 use lazy_static::*;
 use switch::__switch;
+use task::TaskInfoBlock;
 pub use task::{TaskControlBlock, TaskStatus};
 
 pub use context::TaskContext;
@@ -45,6 +46,8 @@ pub struct TaskManagerInner {
     tasks: [TaskControlBlock; MAX_APP_NUM],
     /// id of current `Running` task
     current_task: usize,
+    /// task infos
+    task_infos: [TaskInfoBlock; MAX_APP_NUM],
 }
 
 lazy_static! {
@@ -65,6 +68,7 @@ lazy_static! {
                 UPSafeCell::new(TaskManagerInner {
                     tasks,
                     current_task: 0,
+                    task_infos: Default::default(),
                 })
             },
         }
@@ -135,6 +139,15 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
+
+    /// Get current task info
+    fn current_task_info(&self) -> (TaskStatus, TaskInfoBlock) {
+        let inner = self.inner.exclusive_access();
+        let current_task_no = inner.current_task;
+        let task_status = inner.tasks[current_task_no].task_status;
+        let task_info_block = inner.task_infos[current_task_no];
+        (task_status, task_info_block)
+    }
 }
 
 /// Run the first task in task list.
@@ -168,4 +181,9 @@ pub fn suspend_current_and_run_next() {
 pub fn exit_current_and_run_next() {
     mark_current_exited();
     run_next_task();
+}
+
+/// Get current task info
+pub fn current_task_info() -> (TaskStatus, TaskInfoBlock) {
+    TASK_MANAGER.current_task_info()
 }
