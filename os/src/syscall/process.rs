@@ -6,7 +6,7 @@ use crate::{
 };
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TimeVal {
     pub sec: usize,
     pub usec: usize,
@@ -14,6 +14,7 @@ pub struct TimeVal {
 
 /// Task information
 #[allow(dead_code)]
+#[derive(Debug)]
 pub struct TaskInfo {
     /// Task status in it's life cycle
     status: TaskStatus,
