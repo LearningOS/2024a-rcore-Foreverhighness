@@ -32,7 +32,7 @@ impl TaskInfoBlock {
     pub fn new() -> Self {
         Self {
             syscall_times: [0; MAX_SYSCALL_NUM],
-            ..Default::default()
+            running_times: Default::default(),
         }
     }
 }
