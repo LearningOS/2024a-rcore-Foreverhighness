@@ -151,6 +151,14 @@ impl TaskManager {
         let task_info_block = inner.task_infos[current_task_no];
         (task_status, task_info_block)
     }
+
+    /// Update syscall times
+    fn update_syscall_times(&self, syscall_id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let current_task_no = inner.current_task;
+        let syscall_times = &mut inner.task_infos[current_task_no].syscall_times;
+        syscall_times[syscall_id] += 1;
+    }
 }
 
 /// Run the first task in task list.
@@ -189,4 +197,9 @@ pub fn exit_current_and_run_next() {
 /// Get current task info
 pub fn current_task_info() -> (TaskStatus, TaskInfoBlock) {
     TASK_MANAGER.current_task_info()
+}
+
+/// Update syscall_times
+pub fn update_syscall_times(syscall_id: usize) {
+    TASK_MANAGER.update_syscall_times(syscall_id);
 }

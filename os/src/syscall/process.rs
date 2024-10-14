@@ -7,6 +7,8 @@ use crate::{
     timer::get_time_us,
 };
 
+pub use crate::task::update_syscall_times;
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TimeVal {
