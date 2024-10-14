@@ -20,7 +20,7 @@ pub const APP_SIZE_LIMIT: usize = 0x20000;
 
 /// the max number of syscall
 pub const MAX_SYSCALL_NUM: usize = 500;
-/// clock frequency (per second)
+/// clock frequency (tick per second)
 pub const CLOCK_FREQ: usize = 12_500_000;
 /// the physical memory end
 pub const MEMORY_END: Address = 0x88000000;
