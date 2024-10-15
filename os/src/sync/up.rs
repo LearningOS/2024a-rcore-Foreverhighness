@@ -27,4 +27,12 @@ impl<T> UPSafeCell<T> {
     pub fn exclusive_access(&self) -> RefMut<'_, T> {
         self.inner.borrow_mut()
     }
+
+    /// User is responsible to guarantee that inner struct is only used in
+    /// uniprocessor.
+    pub const unsafe fn const_new(value: T) -> Self {
+        Self {
+            inner: RefCell::new(value),
+        }
+    }
 }
