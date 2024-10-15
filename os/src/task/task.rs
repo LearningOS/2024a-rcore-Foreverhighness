@@ -1,7 +1,8 @@
 //! Types related to task management
 
+use alloc::collections::btree_map::BTreeMap;
+
 use super::TaskContext;
-use crate::config::MAX_SYSCALL_NUM;
 
 /// The task control block (TCB) of a task.
 #[derive(Copy, Clone, Debug)]
@@ -21,9 +22,9 @@ pub struct RunningTimeInfo {
 }
 
 /// The task information block of a task.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TaskInfoBlock {
-    pub syscall_times: [u32; MAX_SYSCALL_NUM],
+    pub syscall_times: BTreeMap<usize, u32>,
     pub running_times: RunningTimeInfo,
 }
 
@@ -31,7 +32,7 @@ impl TaskInfoBlock {
     /// New task info block
     pub fn new() -> Self {
         Self {
-            syscall_times: [0; MAX_SYSCALL_NUM],
+            syscall_times: BTreeMap::new(),
             running_times: Default::default(),
         }
     }

@@ -83,6 +83,8 @@ impl TaskManager {
     /// But in ch3, we load apps statically, so the first task is a real app.
     fn run_first_task(&self) -> ! {
         let mut inner = self.inner.exclusive_access();
+        assert_eq!(inner.current_task, 0);
+
         let task0 = &mut inner.tasks[0];
         task0.task_status = TaskStatus::Running;
         let next_task_cx_ptr = &task0.task_cx as *const TaskContext;
@@ -148,7 +150,7 @@ impl TaskManager {
         let inner = self.inner.exclusive_access();
         let current_task_no = inner.current_task;
         let task_status = inner.tasks[current_task_no].task_status;
-        let task_info_block = inner.task_infos[current_task_no];
+        let task_info_block = inner.task_infos[current_task_no].clone();
         (task_status, task_info_block)
     }
 
@@ -157,7 +159,7 @@ impl TaskManager {
         let mut inner = self.inner.exclusive_access();
         let current_task_no = inner.current_task;
         let syscall_times = &mut inner.task_infos[current_task_no].syscall_times;
-        syscall_times[syscall_id] += 1;
+        *syscall_times.entry(syscall_id).or_default() += 1;
     }
 }
 

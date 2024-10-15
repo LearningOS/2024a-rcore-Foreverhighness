@@ -59,12 +59,20 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
 pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
     trace!("kernel: sys_task_info");
     let (status, info) = current_task_info();
-    let (syscall_times, time) = { (info.syscall_times, info.running_times.real_time_us) };
+    let syscall_times = core::array::from_fn(|syscall_id| {
+        info.syscall_times
+            .get(&syscall_id)
+            .copied()
+            .unwrap_or_default()
+    });
+
+    // TODO(fh): implement it!
+    let time_ms = { 0 };
     unsafe {
         *ti = TaskInfo {
             status,
             syscall_times,
-            time,
+            time: time_ms,
         };
     }
     0
