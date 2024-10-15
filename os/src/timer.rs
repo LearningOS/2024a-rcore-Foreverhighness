@@ -5,10 +5,10 @@ use crate::sbi::set_timer;
 use riscv::register::time;
 #[allow(dead_code)]
 /// The number of milliseconds per second
-const MSEC_PER_SEC: usize = 1000;
+pub const MSEC_PER_SEC: usize = 1000;
 /// The number of microseconds per second
 #[allow(dead_code)]
-const MICRO_PER_SEC: usize = 1_000_000;
+pub const MICRO_PER_SEC: usize = 1_000_000;
 
 /// Timer Tick
 pub type Tick = usize;

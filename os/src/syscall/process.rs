@@ -4,7 +4,7 @@ use crate::{
     task::{
         current_task_info, exit_current_and_run_next, suspend_current_and_run_next, TaskStatus,
     },
-    timer::get_time_us,
+    timer::{get_time_us, MICRO_PER_SEC, MSEC_PER_SEC},
 };
 
 pub use crate::task::update_syscall_times;
@@ -66,8 +66,11 @@ pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
             .unwrap_or_default()
     });
 
-    // TODO(fh): implement it!
-    let time_ms = { 0 };
+    let time_ms = {
+        let now_us = get_time_us();
+        let elapsed = now_us - info.running_times.first_run_time_us;
+        elapsed / (MICRO_PER_SEC / MSEC_PER_SEC)
+    };
     unsafe {
         *ti = TaskInfo {
             status,
