@@ -17,6 +17,7 @@ mod task;
 use crate::config::MAX_APP_NUM;
 use crate::loader::{get_num_app, init_app_cx};
 use crate::sync::UPSafeCell;
+use crate::timer::get_time_us;
 use lazy_static::*;
 use switch::__switch;
 use task::TaskInfoBlock;
@@ -48,6 +49,10 @@ pub struct TaskManagerInner {
     current_task: usize,
     /// task infos
     task_infos: [TaskInfoBlock; MAX_APP_NUM],
+    /// user timer
+    user_timer_us: usize,
+    /// kernel timer
+    kernel_timer_us: usize,
 }
 
 lazy_static! {
@@ -70,6 +75,8 @@ lazy_static! {
                     tasks,
                     current_task: 0,
                     task_infos: Default::default(),
+                    user_timer_us: 0,
+                    kernel_timer_us: 0,
                 })
             },
         }
@@ -171,27 +178,89 @@ impl TaskManager {
 
     /// Start user timer
     fn user_timer_start(&self) {
-        todo!();
+        let mut inner = self.inner.exclusive_access();
+        let current_task_no = inner.current_task;
+        let now_us = get_time_us();
+
+        trace!("T[{current_task_no}] user timer start at {now_us}");
+
+        let timer_us = &mut inner.user_timer_us;
+
+        assert_eq!(*timer_us, 0, "timer start without reset.");
+        *timer_us = now_us;
     }
 
     /// Stop user timer
     fn user_timer_stop(&self) {
-        todo!();
+        let mut inner = self.inner.exclusive_access();
+        let current_task_no = inner.current_task;
+        let now_us = get_time_us();
+
+        trace!("T[{current_task_no}] user timer stop at {now_us}us");
+
+        let timer_us = inner.user_timer_us;
+        let task_timer = &mut inner.task_infos[current_task_no].running_times.user_time_us;
+
+        assert_ne!(timer_us, 0, "timer stop without set.");
+        let elapsed_us = now_us - timer_us;
+
+        *task_timer += elapsed_us;
+
+        inner.user_timer_us = 0;
     }
 
     /// Start kernel timer
     fn kernel_timer_start(&self) {
-        todo!();
+        let mut inner = self.inner.exclusive_access();
+        let current_task_no = inner.current_task;
+        let now_us = get_time_us();
+
+        trace!("T[{current_task_no}] kernel timer start at {now_us}us");
+
+        let timer_us = &mut inner.kernel_timer_us;
+
+        assert_eq!(*timer_us, 0, "timer start without reset.");
+        *timer_us = now_us;
     }
 
     /// Stop kernel timer
     fn kernel_timer_stop(&self) {
-        todo!();
+        let mut inner = self.inner.exclusive_access();
+        let current_task_no = inner.current_task;
+        let now_us = get_time_us();
+
+        trace!("T[{current_task_no}] kernel timer stop at {now_us}us");
+
+        let timer_us = inner.kernel_timer_us;
+        let task_timer = &mut inner.task_infos[current_task_no]
+            .running_times
+            .kernel_time_us;
+
+        assert_ne!(timer_us, 0, "timer stop without set.");
+        let elapsed_us = now_us - timer_us;
+
+        *task_timer += elapsed_us;
+
+        inner.kernel_timer_us = 0;
     }
 
     /// Update task first run time info
     fn update_task_first_run_time(&self) {
-        todo!()
+        let mut inner = self.inner.exclusive_access();
+        let current_task_no = inner.current_task;
+
+        let first_run_time_us = &mut inner.task_infos[current_task_no]
+            .running_times
+            .first_run_time_us;
+
+        if *first_run_time_us == 0 {
+            let now_us = get_time_us();
+            trace!("T[{current_task_no}] first run at {now_us}us");
+            *first_run_time_us = now_us;
+
+            drop(inner);
+            self.user_timer_start();
+        }
     }
 }
 
