@@ -18,7 +18,7 @@ pub struct TaskControlBlock {
 pub struct RunningTimeInfo {
     pub user_time_us: usize,
     pub kernel_time_us: usize,
-    pub real_time_us: usize,
+    pub first_run_time_us: usize,
 }
 
 /// The task information block of a task.

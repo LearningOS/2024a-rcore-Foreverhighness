@@ -92,6 +92,7 @@ impl TaskManager {
         let mut _unused = TaskContext::zero_init();
 
         trace!("Spawn first task");
+        self.update_task_first_run_time();
         // before this, we should drop local variables that must be dropped manually
         unsafe {
             __switch(&mut _unused as *mut TaskContext, next_task_cx_ptr);
@@ -128,6 +129,8 @@ impl TaskManager {
     /// or there is no `Ready` task and we can exit with all applications completed
     fn run_next_task(&self) {
         if let Some(next) = self.find_next_task() {
+            self.kernel_timer_stop();
+
             let mut inner = self.inner.exclusive_access();
             let current = inner.current_task;
             inner.tasks[next].task_status = TaskStatus::Running;
@@ -135,10 +138,14 @@ impl TaskManager {
             let current_task_cx_ptr = &mut inner.tasks[current].task_cx as *mut TaskContext;
             let next_task_cx_ptr = &inner.tasks[next].task_cx as *const TaskContext;
             drop(inner);
+
+            self.update_task_first_run_time();
             // before this, we should drop local variables that must be dropped manually
             unsafe {
                 __switch(current_task_cx_ptr, next_task_cx_ptr);
             }
+
+            self.kernel_timer_start();
             // go back to user mode
         } else {
             panic!("All applications completed!");
@@ -160,6 +167,31 @@ impl TaskManager {
         let current_task_no = inner.current_task;
         let syscall_times = &mut inner.task_infos[current_task_no].syscall_times;
         *syscall_times.entry(syscall_id).or_default() += 1;
+    }
+
+    /// Start user timer
+    fn user_timer_start(&self) {
+        todo!();
+    }
+
+    /// Stop user timer
+    fn user_timer_stop(&self) {
+        todo!();
+    }
+
+    /// Start kernel timer
+    fn kernel_timer_start(&self) {
+        todo!();
+    }
+
+    /// Stop kernel timer
+    fn kernel_timer_stop(&self) {
+        todo!();
+    }
+
+    /// Update task first run time info
+    fn update_task_first_run_time(&self) {
+        todo!()
     }
 }
 
@@ -204,4 +236,24 @@ pub fn current_task_info() -> (TaskStatus, TaskInfoBlock) {
 /// Update syscall_times
 pub fn update_syscall_times(syscall_id: usize) {
     TASK_MANAGER.update_syscall_times(syscall_id);
+}
+
+/// Start user timer
+pub fn user_timer_start() {
+    TASK_MANAGER.user_timer_start();
+}
+
+/// Stop user timer
+pub fn user_timer_stop() {
+    TASK_MANAGER.user_timer_stop();
+}
+
+/// Start kernel timer
+pub fn kernel_timer_start() {
+    TASK_MANAGER.kernel_timer_start();
+}
+
+/// Stop kernel timer
+pub fn kernel_timer_stop() {
+    TASK_MANAGER.kernel_timer_stop();
 }
