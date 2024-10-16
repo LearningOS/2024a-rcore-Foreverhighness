@@ -1,4 +1,7 @@
 //! Types related to task management
+
+use alloc::collections::btree_map::BTreeMap;
+
 use super::TaskContext;
 use crate::config::TRAP_CONTEXT_BASE;
 use crate::mm::{
@@ -7,6 +10,7 @@ use crate::mm::{
 use crate::trap::{trap_handler, TrapContext};
 
 /// The task control block (TCB) of a task.
+#[derive(Debug)]
 pub struct TaskControlBlock {
     /// Save task context
     pub task_cx: TaskContext,
@@ -28,6 +32,9 @@ pub struct TaskControlBlock {
 
     /// Program break
     pub program_brk: usize,
+
+    /// task infos
+    pub infos: TaskInfoBlock,
 }
 
 impl TaskControlBlock {
@@ -63,6 +70,7 @@ impl TaskControlBlock {
             base_size: user_sp,
             heap_bottom: user_sp,
             program_brk: user_sp,
+            infos: TaskInfoBlock::new(),
         };
         // prepare TrapContext in user space
         let trap_cx = task_control_block.get_trap_cx();
@@ -98,8 +106,39 @@ impl TaskControlBlock {
     }
 }
 
-#[derive(Copy, Clone, PartialEq)]
+/// The running time info of task
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct RunningTimeInfo {
+    pub user_time_us: usize,
+    pub kernel_time_us: usize,
+    pub first_run_time_us: usize,
+}
+
+/// The task information block of a task.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TaskInfoBlock {
+    pub syscall_times: BTreeMap<usize, u32>,
+    pub running_times: RunningTimeInfo,
+}
+
+impl TaskInfoBlock {
+    /// New task info block
+    pub fn new() -> Self {
+        Self {
+            syscall_times: BTreeMap::new(),
+            running_times: Default::default(),
+        }
+    }
+}
+
+impl Default for TaskInfoBlock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// task status: UnInit, Ready, Running, Exited
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub enum TaskStatus {
     /// uninitialized
     UnInit,

@@ -2,12 +2,16 @@
 use crate::{
     config::MAX_SYSCALL_NUM,
     task::{
-        change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, TaskStatus,
+        change_program_brk, current_task_info, exit_current_and_run_next,
+        suspend_current_and_run_next, TaskStatus,
     },
+    timer::{get_time_us, MICRO_PER_SEC, MSEC_PER_SEC},
 };
 
+pub use crate::task::update_syscall_times;
+
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TimeVal {
     pub sec: usize,
     pub usec: usize,
@@ -15,6 +19,7 @@ pub struct TimeVal {
 
 /// Task information
 #[allow(dead_code)]
+#[derive(Debug)]
 pub struct TaskInfo {
     /// Task status in it's life cycle
     status: TaskStatus,
@@ -46,12 +51,31 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
     -1
 }
 
-/// YOUR JOB: Finish sys_task_info to pass testcases
+/// get current task info
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TaskInfo`] is splitted by two pages ?
-pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
-    trace!("kernel: sys_task_info NOT IMPLEMENTED YET!");
-    -1
+pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
+    let (status, info) = current_task_info();
+    let syscall_times = core::array::from_fn(|syscall_id| {
+        info.syscall_times
+            .get(&syscall_id)
+            .copied()
+            .unwrap_or_default()
+    });
+
+    let time_ms = {
+        let now_us = get_time_us();
+        let elapsed = now_us - info.running_times.first_run_time_us;
+        elapsed / (MICRO_PER_SEC / MSEC_PER_SEC)
+    };
+    unsafe {
+        *ti = TaskInfo {
+            status,
+            syscall_times,
+            time: time_ms,
+        };
+    }
+    0
 }
 
 // YOUR JOB: Implement mmap.
