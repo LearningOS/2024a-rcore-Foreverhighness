@@ -190,7 +190,7 @@ impl TaskManager {
 
     /// Start user timer
     fn user_timer_start(&self) {
-        let mut inner = self.inner.exclusive_access();
+        let inner = &mut *self.inner.exclusive_access();
         let current_task_no = inner.current_task;
         let now_us = get_time_us();
 
@@ -199,34 +199,34 @@ impl TaskManager {
         let timer_us = &mut inner.user_timer_us;
 
         assert_eq!(*timer_us, 0, "timer start without reset.");
+
         *timer_us = now_us;
     }
 
     /// Stop user timer
     fn user_timer_stop(&self) {
-        let mut inner = self.inner.exclusive_access();
+        let inner = &mut *self.inner.exclusive_access();
         let current_task_no = inner.current_task;
         let now_us = get_time_us();
 
         trace!("T[{current_task_no}] user timer stop at {now_us}us");
 
-        let timer_us = inner.user_timer_us;
+        let timer_us = &mut inner.user_timer_us;
         let task_timer = &mut inner.tasks[current_task_no]
             .infos
             .running_times
             .user_time_us;
 
-        assert_ne!(timer_us, 0, "timer stop without set.");
-        let elapsed_us = now_us - timer_us;
+        assert_ne!(*timer_us, 0, "timer stop without set.");
 
+        let elapsed_us = now_us - *timer_us;
         *task_timer += elapsed_us;
-
-        inner.user_timer_us = 0;
+        *timer_us = 0;
     }
 
     /// Start kernel timer
     fn kernel_timer_start(&self) {
-        let mut inner = self.inner.exclusive_access();
+        let inner = &mut *self.inner.exclusive_access();
         let current_task_no = inner.current_task;
         let now_us = get_time_us();
 
@@ -235,29 +235,29 @@ impl TaskManager {
         let timer_us = &mut inner.kernel_timer_us;
 
         assert_eq!(*timer_us, 0, "timer start without reset.");
+
         *timer_us = now_us;
     }
 
     /// Stop kernel timer
     fn kernel_timer_stop(&self) {
-        let mut inner = self.inner.exclusive_access();
+        let inner = &mut *self.inner.exclusive_access();
         let current_task_no = inner.current_task;
         let now_us = get_time_us();
 
         trace!("T[{current_task_no}] kernel timer stop at {now_us}us");
 
-        let timer_us = inner.kernel_timer_us;
+        let timer_us = &mut inner.kernel_timer_us;
         let task_timer = &mut inner.tasks[current_task_no]
             .infos
             .running_times
             .kernel_time_us;
 
-        assert_ne!(timer_us, 0, "timer stop without set.");
-        let elapsed_us = now_us - timer_us;
+        assert_ne!(*timer_us, 0, "timer stop without set.");
 
+        let elapsed_us = now_us - *timer_us;
         *task_timer += elapsed_us;
-
-        inner.kernel_timer_us = 0;
+        *timer_us = 0;
     }
 
     /// Update task first run time info
