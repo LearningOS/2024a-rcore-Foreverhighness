@@ -6,6 +6,7 @@ use crate::{
         suspend_current_and_run_next, TaskStatus,
     },
     timer::{get_time_us, MICRO_PER_SEC, MSEC_PER_SEC},
+    util::copy_to_user_space,
 };
 
 pub use crate::task::update_syscall_times;
@@ -43,18 +44,24 @@ pub fn sys_yield() -> isize {
     0
 }
 
-/// YOUR JOB: get time with second and microsecond
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
-pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
+pub fn sys_get_time(ts_ptr: *mut TimeVal, _tz: usize) -> isize {
     trace!("kernel: sys_get_time");
-    -1
+    let now_us = get_time_us();
+    let ts = TimeVal {
+        sec: now_us / MICRO_PER_SEC,
+        usec: now_us % MICRO_PER_SEC,
+    };
+    copy_to_user_space(&ts, ts_ptr);
+    0
 }
 
 /// get current task info
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TaskInfo`] is splitted by two pages ?
-pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
+pub fn sys_task_info(ti_ptr: *mut TaskInfo) -> isize {
+    trace!("kernel: sys_task_info");
     let (status, info) = current_task_info();
     let syscall_times = core::array::from_fn(|syscall_id| {
         info.syscall_times
@@ -68,13 +75,12 @@ pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
         let elapsed = now_us - info.running_times.first_run_time_us;
         elapsed / (MICRO_PER_SEC / MSEC_PER_SEC)
     };
-    unsafe {
-        *ti = TaskInfo {
-            status,
-            syscall_times,
-            time: time_ms,
-        };
-    }
+    let ti = TaskInfo {
+        status,
+        syscall_times,
+        time: time_ms,
+    };
+    copy_to_user_space(&ti, ti_ptr);
     0
 }
 
