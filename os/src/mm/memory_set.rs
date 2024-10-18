@@ -374,10 +374,23 @@ bitflags! {
         const R = 1 << 1;
         ///Writable
         const W = 1 << 2;
-        ///Excutable
+        ///Executable
         const X = 1 << 3;
         ///Accessible in U mode
         const U = 1 << 4;
+    }
+}
+
+impl MapPermission {
+    /// Convert from mmap prot
+    pub fn from_prot(prot: usize) -> Self {
+        let bits = (prot as u8) << 1;
+        MapPermission::from_bits(bits).unwrap()
+    }
+
+    /// Add user permission
+    pub fn with_user(self) -> Self {
+        self | MapPermission::U
     }
 }
 
