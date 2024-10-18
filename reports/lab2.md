@@ -89,3 +89,41 @@ impl PhysPageNum {
     }
 }
 ```
+
+## 没有价值的 Arc
+
+[`Arc`](https://doc.rust-lang.org/std/sync/struct.Arc.html) 的实现需要原子操作的支持，在 ch4 出现有点不合时宜。  
+更重要的是，它在这里完全没有起到一点作用。
+
+```rust
+lazy_static! {
+    /// The kernel's initial memory mapping(kernel address space)
+    pub static ref KERNEL_SPACE: Arc<UPSafeCell<MemorySet>> =
+        Arc::new(unsafe { UPSafeCell::new(MemorySet::new_kernel()) });
+}
+```
+
+## 使用库接口
+
+`fence.vme`
+
+`sanity_check`
+
+```rust
+```
+
+## StackFrameAllocator
+
+StackFrameAllocator 实际上拥有着从 current 到 end 这一段内存的所有权，但是代码和文档里均没有体现。
+
+StackFrameAllocator 中 current 和 end 实际是应该是 PhysPageNum 类型。
+
+FrameTracker 并不是一个很恰当的命名，我个人觉得可以改为 PageAllocated 或者 PageOwned
+
+```rust
+pub struct StackFrameAllocator {
+    current: PhysPageNum,       // usize -> PhysPageNum
+    end: PhysPageNum,           // usize -> PhysPageNum
+    recycled: Vec<PhysPageNum>, // usize -> PhysPageNum
+}
+```
