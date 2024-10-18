@@ -282,12 +282,20 @@ impl TaskManager {
 
     /// mmap
     fn mmap(&self, addr: usize, len: usize, prot: usize) -> isize {
-        todo!()
+        let mut inner = self.inner.exclusive_access();
+        let current_task_no = inner.current_task;
+        let memory_set = &mut inner.tasks[current_task_no].memory_set;
+
+        memory_set.mmap(addr, len, prot)
     }
 
     /// munmap
     fn munmap(&self, addr: usize, len: usize) -> isize {
-        todo!()
+        let mut inner = self.inner.exclusive_access();
+        let current_task_no = inner.current_task;
+        let memory_set = &mut inner.tasks[current_task_no].memory_set;
+
+        memory_set.munmap(addr, len)
     }
 }
 

@@ -88,12 +88,12 @@ pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
 
 /// mmap
 pub fn sys_mmap(addr: usize, len: usize, prot: usize) -> isize {
-    trace!("kernel: sys_mmap");
+    trace!("kernel: sys_mmap(addr: 0x{addr:0X}, len: {len}, prot: 0x{prot:b})");
     const PROT_MASK: usize = 0b111;
 
     let addr_aligned = addr % PAGE_SIZE == 0;
-    let valid_prot = prot & !PROT_MASK != 0;
-    let prot_none = prot & PROT_MASK == 0;
+    let valid_prot = (prot & !PROT_MASK) == 0;
+    let prot_none = (prot & PROT_MASK) == 0;
 
     if addr_aligned && valid_prot && !prot_none {
         return mmap(addr, len, prot);
@@ -103,7 +103,7 @@ pub fn sys_mmap(addr: usize, len: usize, prot: usize) -> isize {
 
 /// munmap
 pub fn sys_munmap(addr: usize, len: usize) -> isize {
-    trace!("kernel: sys_munmap");
+    trace!("kernel: sys_munmap(addr: 0x{addr:0X}, len: {len})");
 
     let addr_aligned = addr % PAGE_SIZE == 0;
 
