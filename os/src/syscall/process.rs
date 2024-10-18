@@ -1,8 +1,8 @@
 //! Process management syscalls
 use crate::{
-    config::MAX_SYSCALL_NUM,
+    config::{MAX_SYSCALL_NUM, PAGE_SIZE},
     task::{
-        change_program_brk, current_task_info, exit_current_and_run_next,
+        change_program_brk, current_task_info, exit_current_and_run_next, mmap, munmap,
         suspend_current_and_run_next, TaskStatus,
     },
     timer::{get_time_us, MICRO_PER_SEC, MSEC_PER_SEC},
@@ -86,15 +86,30 @@ pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
     0
 }
 
-// YOUR JOB: Implement mmap.
-pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
-    trace!("kernel: sys_mmap NOT IMPLEMENTED YET!");
+/// mmap
+pub fn sys_mmap(addr: usize, len: usize, prot: usize) -> isize {
+    trace!("kernel: sys_mmap");
+    const PROT_MASK: usize = 0b111;
+
+    let addr_aligned = addr % PAGE_SIZE == 0;
+    let valid_prot = prot & !PROT_MASK != 0;
+    let prot_none = prot & PROT_MASK == 0;
+
+    if addr_aligned && valid_prot && !prot_none {
+        return mmap(addr, len, prot);
+    }
     -1
 }
 
-// YOUR JOB: Implement munmap.
-pub fn sys_munmap(_start: usize, _len: usize) -> isize {
-    trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
+/// munmap
+pub fn sys_munmap(addr: usize, len: usize) -> isize {
+    trace!("kernel: sys_munmap");
+
+    let addr_aligned = addr % PAGE_SIZE == 0;
+
+    if addr_aligned {
+        return munmap(addr, len);
+    }
     -1
 }
 /// change data segment size

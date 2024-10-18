@@ -279,6 +279,16 @@ impl TaskManager {
             self.user_timer_start();
         }
     }
+
+    /// mmap
+    fn mmap(&self, addr: usize, len: usize, prot: usize) -> isize {
+        todo!()
+    }
+
+    /// munmap
+    fn munmap(&self, addr: usize, len: usize) -> isize {
+        todo!()
+    }
 }
 
 /// Run the first task in task list.
@@ -357,4 +367,14 @@ pub fn kernel_timer_start() {
 /// Stop kernel timer
 pub fn kernel_timer_stop() {
     TASK_MANAGER.kernel_timer_stop();
+}
+
+/// Create memory map for user space
+pub fn mmap(addr: usize, len: usize, prot: usize) -> isize {
+    TASK_MANAGER.mmap(addr, len, prot)
+}
+
+/// Remove memory map for user space
+pub fn munmap(addr: usize, len: usize) -> isize {
+    TASK_MANAGER.munmap(addr, len)
 }
