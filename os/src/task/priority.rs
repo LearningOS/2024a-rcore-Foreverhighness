@@ -10,12 +10,7 @@ pub type Priority = PriorityImpl<PriorityInner>;
 pub struct PriorityImpl<T>(pub(super) T);
 
 impl<T> PriorityImpl<T> {
-    const DEFAULT: isize = 16;
-
-    /// new with priority
-    pub fn new(value: T) -> Self {
-        Self(value)
-    }
+    pub const DEFAULT: isize = 16;
 }
 
 impl<T> Default for PriorityImpl<T>
@@ -31,13 +26,12 @@ where
 impl<T> TryFrom<isize> for PriorityImpl<T>
 where
     T: TryFrom<isize>,
-    <T as TryFrom<isize>>::Error: core::fmt::Debug,
 {
     type Error = ();
 
     fn try_from(value: isize) -> Result<Self, Self::Error> {
         match value {
-            value @ 2..=isize::MAX => Ok(Self(T::try_from(value).unwrap())),
+            value @ 2..=isize::MAX => T::try_from(value).map(Self).map_err(|_| ()),
             _ => Err(()),
         }
     }
