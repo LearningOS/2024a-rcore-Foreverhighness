@@ -1,6 +1,6 @@
 //! Priority definition
 
-type PriorityInner = u32;
+type PriorityInner = isize;
 
 /// Task Priority
 pub type Priority = PriorityImpl<PriorityInner>;

@@ -7,7 +7,7 @@ use core::{
 
 use super::priority::PriorityImpl;
 
-type StrideInner = u32;
+type StrideInner = usize;
 
 /// Stride algorithm
 pub type Stride = StrideImpl<StrideInner>;
@@ -43,14 +43,22 @@ impl BigStride<u8> for u8 {
     const BIG_STRIDE_DIV_2: u8 = Self::BIG_STRIDE / 2;
 }
 
+impl BigStride<usize> for usize {
+    const BIG_STRIDE: usize = isize::MAX as usize;
+    const BIG_STRIDE_DIV_2: usize = Self::BIG_STRIDE / 2;
+}
+
 impl<T> StrideImpl<T>
 where
-    T: Div<T, Output = T> + Clone + Copy,
+    T: Div<T, Output = T> + BigStride<T> + Clone + Copy,
     Wrapping<T>: AddAssign,
-    T: BigStride<T>,
 {
-    pub fn step(&mut self, priority: PriorityImpl<T>) {
-        self.stride += Wrapping(T::BIG_STRIDE / priority.0);
+    pub fn step<P, E>(&mut self, priority: PriorityImpl<P>)
+    where
+        T: TryFrom<P, Error = E>,
+        E: core::fmt::Debug,
+    {
+        self.stride += Wrapping(T::BIG_STRIDE / priority.0.try_into().unwrap());
     }
 }
 
@@ -149,7 +157,7 @@ mod tests {
 
             let task = &mut tasks[id];
             task.stride
-                .step((task.priority as isize).try_into().unwrap());
+                .step(PriorityImpl::<u8>::try_from(task.priority as isize).unwrap());
             task.real_stride += (u8::BIG_STRIDE / task.priority) as u64;
         }
     }
