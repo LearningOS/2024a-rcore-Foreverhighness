@@ -7,7 +7,7 @@ type PriorityInner = u32;
 /// Task Priority
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Priority(PriorityInner);
+pub struct Priority(pub PriorityInner);
 
 impl Priority {
     const DEFAULT: PriorityInner = 16;
