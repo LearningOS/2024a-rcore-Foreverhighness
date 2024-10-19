@@ -5,6 +5,7 @@ use crate::config::TRAP_CONTEXT_BASE;
 use crate::mm::{MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE};
 use crate::sync::UPSafeCell;
 use crate::trap::{trap_handler, TrapContext};
+use alloc::collections::btree_map::BTreeMap;
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::cell::RefMut;
@@ -12,6 +13,7 @@ use core::cell::RefMut;
 /// Task control block structure
 ///
 /// Directly save the contents that will not change during running
+#[derive(Debug)]
 pub struct TaskControlBlock {
     // Immutable
     /// Process identifier
@@ -36,6 +38,7 @@ impl TaskControlBlock {
     }
 }
 
+#[derive(Debug)]
 pub struct TaskControlBlockInner {
     /// The physical page number of the frame where the trap context is placed
     pub trap_cx_ppn: PhysPageNum,
@@ -68,6 +71,9 @@ pub struct TaskControlBlockInner {
 
     /// Program break
     pub program_brk: usize,
+
+    /// task infos
+    pub infos: TaskInfoBlock,
 }
 
 impl TaskControlBlockInner {
@@ -118,6 +124,7 @@ impl TaskControlBlock {
                     exit_code: 0,
                     heap_bottom: user_sp,
                     program_brk: user_sp,
+                    infos: TaskInfoBlock::new(),
                 })
             },
         };
@@ -191,6 +198,7 @@ impl TaskControlBlock {
                     exit_code: 0,
                     heap_bottom: parent_inner.heap_bottom,
                     program_brk: parent_inner.program_brk,
+                    infos: TaskInfoBlock::new(),
                 })
             },
         });
@@ -238,8 +246,39 @@ impl TaskControlBlock {
     }
 }
 
-#[derive(Copy, Clone, PartialEq)]
+/// The running time info of task
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct RunningTimeInfo {
+    pub user_time_us: usize,
+    pub kernel_time_us: usize,
+    pub first_run_time_us: usize,
+}
+
+/// The task information block of a task.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TaskInfoBlock {
+    pub syscall_times: BTreeMap<usize, u32>,
+    pub running_times: RunningTimeInfo,
+}
+
+impl TaskInfoBlock {
+    /// New task info block
+    pub fn new() -> Self {
+        Self {
+            syscall_times: BTreeMap::new(),
+            running_times: Default::default(),
+        }
+    }
+}
+
+impl Default for TaskInfoBlock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// task status: UnInit, Ready, Running, Exited
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub enum TaskStatus {
     /// uninitialized
     UnInit,
@@ -249,4 +288,26 @@ pub enum TaskStatus {
     Running,
     /// exited
     Zombie,
+}
+
+impl TaskControlBlockInner {
+    /// Update syscall times
+    pub fn update_syscall_times(&mut self, syscall_id: usize) {
+        *self.infos.syscall_times.entry(syscall_id).or_default() += 1;
+    }
+
+    /// Get current task info
+    pub fn task_info(&self) -> (TaskStatus, TaskInfoBlock) {
+        (self.task_status, self.infos.clone())
+    }
+
+    /// mmap
+    pub fn mmap(&mut self, addr: usize, len: usize, prot: usize) -> isize {
+        self.memory_set.mmap(addr, len, prot)
+    }
+
+    /// munmap
+    pub fn munmap(&mut self, addr: usize, len: usize) -> isize {
+        self.memory_set.munmap(addr, len)
+    }
 }

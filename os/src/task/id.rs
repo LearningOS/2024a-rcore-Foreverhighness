@@ -48,6 +48,7 @@ lazy_static! {
 }
 
 /// Abstract structure of PID
+#[derive(Debug)]
 pub struct PidHandle(pub usize);
 
 impl Drop for PidHandle {
@@ -70,6 +71,7 @@ pub fn kernel_stack_position(app_id: usize) -> (usize, usize) {
 }
 
 /// Kernel stack for a process(task)
+#[derive(Debug)]
 pub struct KernelStack(pub usize);
 
 /// allocate a new kernel stack
