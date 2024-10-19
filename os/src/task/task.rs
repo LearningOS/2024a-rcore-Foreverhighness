@@ -337,6 +337,12 @@ impl TaskControlBlock {
 }
 
 impl TaskControlBlockInner {
+    /// set task priority
+    pub fn set_priority(&mut self, priority: Priority) {
+        self.priority = priority
+    }
+
+    /// update stride
     pub fn update_stride(&mut self) {
         self.stride.step(self.priority);
     }
