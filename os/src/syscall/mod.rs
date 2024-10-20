@@ -61,6 +61,9 @@ use crate::fs::Stat;
 
 /// handle syscall exception with `syscall_id` and other arguments
 pub fn syscall(syscall_id: usize, args: [usize; 4]) -> isize {
+    let _guard = SyscallChecker::new(syscall_id, args);
+
+    update_syscall_times(syscall_id);
     match syscall_id {
         SYSCALL_OPEN => sys_open(args[1] as *const u8, args[2] as u32),
         SYSCALL_CLOSE => sys_close(args[0]),
@@ -83,5 +86,79 @@ pub fn syscall(syscall_id: usize, args: [usize; 4]) -> isize {
         SYSCALL_SPAWN => sys_spawn(args[0] as *const u8),
         SYSCALL_SET_PRIORITY => sys_set_priority(args[0] as isize),
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
+    }
+}
+
+use crate::{sync::UPSafeCell, task::update_syscall_times};
+
+/// Checker state in syscall
+struct SyscallCheckerState {
+    // assert all sys_func will return
+    counter: alloc::collections::BTreeMap<usize, i32>,
+}
+
+impl SyscallCheckerState {
+    /// Construct a syscall checker
+    const fn new() -> Self {
+        Self {
+            counter: alloc::collections::BTreeMap::new(),
+        }
+    }
+}
+
+static CHECKER_STATE: UPSafeCell<SyscallCheckerState> =
+    unsafe { UPSafeCell::const_new(SyscallCheckerState::new()) };
+
+/// Syscall checker
+#[allow(dead_code)]
+#[derive(Debug)]
+struct SyscallChecker<Args> {
+    syscall_id: usize,
+    args: Args,
+}
+
+impl<Args> SyscallChecker<Args> {
+    fn new(syscall_id: usize, args: Args) -> SyscallChecker<Args> {
+        let checker = SyscallChecker { syscall_id, args };
+        checker.start();
+        checker
+    }
+
+    fn start(&self) {
+        let mut state = CHECKER_STATE.exclusive_access();
+
+        // counter
+        assert!(
+            state
+                .counter
+                .iter()
+                .filter(|(&id, _)| id != SYSCALL_YIELD && id != SYSCALL_EXIT)
+                .all(|(_, &x)| x == 0),
+            "counter: {:?}",
+            state.counter
+        );
+        *state.counter.entry(self.syscall_id).or_default() += 1;
+    }
+
+    fn finalize(&self) {
+        let mut state = CHECKER_STATE.exclusive_access();
+
+        // counter
+        *state.counter.entry(self.syscall_id).or_default() -= 1;
+        assert!(
+            state
+                .counter
+                .iter()
+                .filter(|(&id, _)| id != SYSCALL_YIELD && id != SYSCALL_EXIT)
+                .all(|(_, &x)| x == 0),
+            "counter: {:?}",
+            state.counter
+        );
+    }
+}
+
+impl<Args> Drop for SyscallChecker<Args> {
+    fn drop(&mut self) {
+        self.finalize();
     }
 }

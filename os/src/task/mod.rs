@@ -16,7 +16,9 @@
 mod context;
 mod id;
 mod manager;
+mod priority;
 mod processor;
+mod stride;
 mod switch;
 #[allow(clippy::module_inception)]
 #[allow(rustdoc::private_intra_doc_links)]
@@ -32,10 +34,13 @@ pub use task::{TaskControlBlock, TaskStatus};
 
 pub use id::{kstack_alloc, pid_alloc, KernelStack, PidHandle};
 pub use manager::add_task;
+pub use priority::Priority;
 pub use processor::{
-    current_task, current_trap_cx, current_user_token, run_tasks, schedule, take_current_task,
-    Processor,
+    current_task, current_task_info, current_trap_cx, current_user_token, kernel_timer_start,
+    kernel_timer_stop, mmap, munmap, run_tasks, schedule, take_current_task, update_syscall_times,
+    user_timer_start, user_timer_stop, Processor,
 };
+
 /// Suspend the current 'Running' task and run the next task in task list.
 pub fn suspend_current_and_run_next() {
     // There must be an application running.

@@ -8,6 +8,7 @@ use core::cell::{RefCell, RefMut};
 ///
 /// In order to get mutable reference of inner data, call
 /// `exclusive_access`.
+#[derive(Debug)]
 pub struct UPSafeCell<T> {
     /// inner data
     inner: RefCell<T>,
@@ -26,5 +27,13 @@ impl<T> UPSafeCell<T> {
     /// Panic if the data has been borrowed.
     pub fn exclusive_access(&self) -> RefMut<'_, T> {
         self.inner.borrow_mut()
+    }
+
+    /// User is responsible to guarantee that inner struct is only used in
+    /// uniprocessor.
+    pub const unsafe fn const_new(value: T) -> Self {
+        Self {
+            inner: RefCell::new(value),
+        }
     }
 }

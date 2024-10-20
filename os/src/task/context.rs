@@ -1,8 +1,9 @@
 //! Implementation of [`TaskContext`]
 use crate::trap::trap_return;
 
-#[repr(C)]
 /// task context structure containing some registers
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
 pub struct TaskContext {
     /// Ret position after task switching
     ra: usize,
