@@ -83,16 +83,19 @@ pub fn sys_fstat(fd: usize, st: *mut Stat) -> isize {
         current_task().unwrap().pid.0
     );
 
-    let task = current_task().unwrap();
-    let inner = task.inner_exclusive_access();
+    let stat = {
+        let task = current_task().unwrap();
+        let inner = task.inner_exclusive_access();
+        let Some(Some(file)) = inner.fd_table.get(fd) else {
+            return -1;
+        };
+        file.status().into()
+    };
 
-    if let Some(Some(file)) = inner.fd_table.get(fd) {
-        let stat = file.status().into();
-        unsafe {
-            UserSpacePtr::from(st).write(stat);
-        }
+    unsafe {
+        UserSpacePtr::from(st).write(stat);
     }
-    -1
+    0
 }
 
 /// YOUR JOB: Implement linkat.
