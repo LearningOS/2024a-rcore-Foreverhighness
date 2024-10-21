@@ -209,6 +209,64 @@ impl Inode {
         self.inode_id
     }
 
+    /// Return Some(inode_id, offset in disk_inode)
+    fn find_entry_inode_id_and_offset(&self, name: &str) -> Option<(u32, usize)> {
+        self.read_disk_inode(|disk_inode| {
+            assert!(disk_inode.is_dir());
+
+            let file_count = (disk_inode.size as usize) / DIRENT_SZ;
+            let mut entry = DirEntry::empty();
+            for offset in (0..file_count).map(|i| i * DIRENT_SZ) {
+                disk_inode.read_at(offset, entry.as_bytes_mut(), &self.block_device);
+
+                if entry.name() == name {
+                    return Some((entry.inode_id(), offset));
+                }
+            }
+            None
+        })
+    }
+
+    /// Create new link
+    pub fn link_at(&self, old_path: &str, new_path: &str) -> Option<Arc<Inode>> {
+        let mut fs = self.fs.lock();
+
+        let Some((inode_id, _)) = self.find_entry_inode_id_and_offset(old_path) else {
+            return None;
+        };
+
+        let (block_id, block_offset) = fs.get_disk_inode_pos(inode_id);
+        get_block_cache(block_id as usize, Arc::clone(&self.block_device))
+            .lock()
+            .modify(block_offset, DiskInode::new_link);
+
+        self.modify_disk_inode(|root_inode| {
+            // append file in the dirent
+            let file_count = (root_inode.size as usize) / DIRENT_SZ;
+            let new_size = (file_count + 1) * DIRENT_SZ;
+            // increase size
+            self.increase_size(new_size as u32, root_inode, &mut fs);
+            // write dirent
+            let dirent = DirEntry::new(new_path, inode_id);
+            root_inode.write_at(
+                file_count * DIRENT_SZ,
+                dirent.as_bytes(),
+                &self.block_device,
+            );
+        });
+
+        block_cache_sync_all();
+
+        // return inode
+        Some(Arc::new(Self::new(
+            block_id,
+            block_offset,
+            self.fs.clone(),
+            self.block_device.clone(),
+            inode_id,
+        )))
+    }
+
     /// Remove dir entry by name, already get self's DiskInode, return removed inode_id
     fn remove_dir_entry_swap(&self, name: &str, disk_inode: &mut DiskInode) -> Option<u32> {
         // assert it is a directory

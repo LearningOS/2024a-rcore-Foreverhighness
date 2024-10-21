@@ -448,6 +448,11 @@ impl DiskInode {
         self.links_count
     }
 
+    /// Increase link count
+    pub fn new_link(&mut self) {
+        self.links_count += 1;
+    }
+
     /// Decrease link count
     pub fn unlink(&mut self) {
         self.links_count -= 1;

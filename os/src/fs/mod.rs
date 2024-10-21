@@ -23,5 +23,5 @@ pub trait File: Send + Sync {
 }
 
 pub use file_status::{FileStatus, Stat, StatMode};
-pub use inode::{list_apps, open_file, unlink_at, OSInode, OpenFlags};
+pub use inode::{link_at, list_apps, open_file, unlink_at, OSInode, OpenFlags};
 pub use stdio::{Stdin, Stdout};
