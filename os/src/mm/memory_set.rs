@@ -36,6 +36,7 @@ pub fn kernel_token() -> usize {
 }
 
 /// address space
+#[derive(Debug)]
 pub struct MemorySet {
     page_table: PageTable,
     areas: Vec<MapArea>,
@@ -159,11 +160,11 @@ impl MemorySet {
             None,
         );
         info!("mapping memory-mapped registers");
-        for pair in MMIO {
+        for &(mmio_start_va, mmio_len) in MMIO {
             memory_set.push(
                 MapArea::new(
-                    (*pair).0.into(),
-                    ((*pair).0 + (*pair).1).into(),
+                    mmio_start_va.into(),
+                    (mmio_start_va + mmio_len).into(),
                     MapType::Identical,
                     MapPermission::R | MapPermission::W,
                 ),
@@ -317,8 +318,79 @@ impl MemorySet {
             false
         }
     }
+
+    fn all_valid(&self, start_va: VirtAddr, end_va: VirtAddr) -> bool {
+        VPNRange::new(start_va.floor(), end_va.ceil())
+            .into_iter()
+            .all(|vpn| self.translate(vpn).map_or(false, |e| e.is_valid()))
+    }
+
+    fn all_invalid(&self, start_va: VirtAddr, end_va: VirtAddr) -> bool {
+        VPNRange::new(start_va.floor(), end_va.ceil())
+            .into_iter()
+            .all(|vpn| self.translate(vpn).map_or(true, |e| !e.is_valid()))
+    }
+
+    /// mmap
+    pub fn mmap(&mut self, addr: usize, len: usize, prot: usize) -> isize {
+        let start_va = VirtAddr::from(addr);
+        let end_va = VirtAddr::from(addr + len);
+        let permission = MapPermission::from_prot(prot).with_user();
+
+        if !self.all_invalid(start_va, end_va) {
+            return -1;
+        }
+
+        trace!("mmap at 0x{addr:0X}, len: {len}, [{start_va:?}, {end_va:?}], prot: 0b{prot:b}, permission: {permission:?}");
+        self.insert_framed_area(start_va, end_va, permission);
+
+        assert!(self.all_valid(start_va, end_va));
+
+        trace!(
+            "add vpn: {:?}",
+            VPNRange::new(start_va.floor(), end_va.ceil())
+                .into_iter()
+                .collect::<Vec<_>>()
+        );
+
+        0
+    }
+
+    /// munmap
+    pub fn munmap(&mut self, addr: usize, len: usize) -> isize {
+        let start_va = VirtAddr::from(addr);
+        let end_va = VirtAddr::from(addr + len);
+
+        if !self.all_valid(start_va, end_va) {
+            return -1;
+        }
+
+        trace!("munmap at 0x{addr:0X}, len: {len}, [{start_va:?}, {end_va:?}], ");
+
+        // munmap in middle of area?
+        if let Some(area) = self
+            .areas
+            .iter_mut()
+            .find(|area| area.vpn_range.get_start() == start_va.floor())
+        {
+            trace!(
+                "area: {area:?}, [{:?}, {:?}]",
+                start_va.floor(),
+                end_va.ceil()
+            );
+            assert_eq!(area.vpn_range.get_end(), end_va.ceil());
+            area.unmap(&mut self.page_table);
+        } else {
+            unimplemented!()
+        }
+
+        assert!(self.all_invalid(start_va, end_va));
+
+        0
+    }
 }
 /// map area structure, controls a contiguous piece of virtual memory
+#[derive(Debug)]
 pub struct MapArea {
     vpn_range: VPNRange,
     data_frames: BTreeMap<VirtPageNum, FrameTracker>,
@@ -433,10 +505,23 @@ bitflags! {
         const R = 1 << 1;
         ///Writable
         const W = 1 << 2;
-        ///Excutable
+        ///Executable
         const X = 1 << 3;
         ///Accessible in U mode
         const U = 1 << 4;
+    }
+}
+
+impl MapPermission {
+    /// Convert from mmap prot
+    pub fn from_prot(prot: usize) -> Self {
+        let bits = (prot as u8) << 1;
+        MapPermission::from_bits(bits).unwrap()
+    }
+
+    /// Add user permission
+    pub fn with_user(self) -> Self {
+        self | MapPermission::U
     }
 }
 

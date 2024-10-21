@@ -28,6 +28,8 @@ use riscv::register::{
     sie, stval, stvec,
 };
 
+use crate::task::{kernel_timer_start, kernel_timer_stop, user_timer_start, user_timer_stop};
+
 global_asm!(include_str!("trap.S"));
 
 /// Initialize trap handling
@@ -57,6 +59,9 @@ pub fn enable_timer_interrupt() {
 /// trap handler
 #[no_mangle]
 pub fn trap_handler() -> ! {
+    user_timer_stop();
+    kernel_timer_start();
+
     set_kernel_trap_entry();
     let scause = scause::read();
     let stval = stval::read();
@@ -110,6 +115,10 @@ pub fn trap_handler() -> ! {
         trace!("[kernel] trap_handler: .. check signals {}", msg);
         exit_current_and_run_next(errno);
     }
+
+    kernel_timer_stop();
+    user_timer_start();
+
     trap_return();
 }
 

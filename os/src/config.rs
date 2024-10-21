@@ -2,12 +2,15 @@
 
 #[allow(unused)]
 
-/// user app's stack size
+/// Physical address
+pub type Address = usize;
+
+/// user app's stack size (Byte)
 pub const USER_STACK_SIZE: usize = 4096 * 2;
-/// kernel stack size
+/// kernel stack size (Byte)
 pub const KERNEL_STACK_SIZE: usize = 4096 * 2;
-/// kernel heap size
-pub const KERNEL_HEAP_SIZE: usize = 0x200_0000;
+/// kernel heap size (Byte)
+pub const KERNEL_HEAP_SIZE: usize = 0x0200_0000;
 
 /// page size : 4KB
 pub const PAGE_SIZE: usize = 0x1000;
@@ -19,8 +22,8 @@ pub const MAX_SYSCALL_NUM: usize = 500;
 pub const TRAMPOLINE: usize = usize::MAX - PAGE_SIZE + 1;
 /// the virtual addr of trap context
 pub const TRAP_CONTEXT_BASE: usize = TRAMPOLINE - PAGE_SIZE;
-/// clock frequency
-pub const CLOCK_FREQ: usize = 12500000;
+/// clock frequency (ticks per second)
+pub const CLOCK_FREQ: usize = 12_500_000;
 /// the physical memory end
 pub const MEMORY_END: usize = 0x88000000;
 /// The base address of control registers in Virtio_Block device

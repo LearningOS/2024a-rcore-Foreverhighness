@@ -44,10 +44,11 @@ lazy_static! {
     static ref PID_ALLOCATOR: UPSafeCell<RecycleAllocator> =
         unsafe { UPSafeCell::new(RecycleAllocator::new()) };
     static ref KSTACK_ALLOCATOR: UPSafeCell<RecycleAllocator> =
-        unsafe { UPSafeCell::new(RecycleAllocator::new()) };    
+        unsafe { UPSafeCell::new(RecycleAllocator::new()) };
 }
 
 /// Abstract structure of PID
+#[derive(Debug)]
 pub struct PidHandle(pub usize);
 
 impl Drop for PidHandle {
@@ -70,6 +71,7 @@ pub fn kernel_stack_position(app_id: usize) -> (usize, usize) {
 }
 
 /// Kernel stack for a process(task)
+#[derive(Debug)]
 pub struct KernelStack(pub usize);
 
 /// allocate a new kernel stack

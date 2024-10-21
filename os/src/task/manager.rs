@@ -26,6 +26,7 @@ impl TaskManager {
         self.ready_queue.push_back(task);
     }
     /// Take a process out of the ready queue
+    #[allow(unused)]
     pub fn fetch(&mut self) -> Option<Arc<TaskControlBlock>> {
         self.ready_queue.pop_front()
     }
@@ -42,7 +43,7 @@ lazy_static! {
 
 /// Add process to ready queue
 pub fn add_task(task: Arc<TaskControlBlock>) {
-	//trace!("kernel: TaskManager::add_task");
+    //trace!("kernel: TaskManager::add_task");
     PID2TCB
         .exclusive_access()
         .insert(task.getpid(), Arc::clone(&task));
@@ -51,8 +52,27 @@ pub fn add_task(task: Arc<TaskControlBlock>) {
 
 /// Take a process out of the ready queue
 pub fn fetch_task() -> Option<Arc<TaskControlBlock>> {
-	//trace!("kernel: TaskManager::fetch_task");
-    TASK_MANAGER.exclusive_access().fetch()
+    //trace!("kernel: TaskManager::fetch_task");
+    // TASK_MANAGER.exclusive_access().fetch()
+    TASK_MANAGER.exclusive_access().fetch_by_stride()
+}
+
+impl TaskManager {
+    /// Take a process out of the ready queue
+    pub fn fetch_by_stride(&mut self) -> Option<Arc<TaskControlBlock>> {
+        if let Some((index, _)) = self
+            .ready_queue
+            .iter()
+            .enumerate()
+            .min_by_key(|(_, task)| task.inner_exclusive_access().stride)
+        {
+            self.ready_queue
+                .swap_remove_back(index)
+                .inspect(|task| task.inner_exclusive_access().update_stride())
+        } else {
+            None
+        }
+    }
 }
 
 /// Get process by pid

@@ -12,6 +12,9 @@ use crate::trap::TrapContext;
 use alloc::sync::Arc;
 use lazy_static::*;
 
+use super::task::TaskInfoBlock;
+use crate::timer::get_time_us;
+
 /// Processor management structure
 pub struct Processor {
     ///The task currently executing on the current processor
@@ -19,6 +22,12 @@ pub struct Processor {
 
     ///The basic control flow of each core, helping to select and switch process
     idle_task_cx: TaskContext,
+
+    /// kernel timer
+    kernel_timer_us: usize,
+
+    /// user timer
+    user_timer_us: usize,
 }
 
 impl Processor {
@@ -27,6 +36,8 @@ impl Processor {
         Self {
             current: None,
             idle_task_cx: TaskContext::zero_init(),
+            kernel_timer_us: 0,
+            user_timer_us: 0,
         }
     }
 
@@ -37,6 +48,8 @@ impl Processor {
 
     ///Get current task in moving semanteme
     pub fn take_current(&mut self) -> Option<Arc<TaskControlBlock>> {
+        self.kernel_timer_stop();
+
         self.current.take()
     }
 
@@ -55,6 +68,9 @@ lazy_static! {
 pub fn run_tasks() {
     loop {
         let mut processor = PROCESSOR.exclusive_access();
+
+        assert!(processor.current.is_none());
+
         if let Some(task) = fetch_task() {
             let idle_task_cx_ptr = processor.get_idle_task_cx_ptr();
             // access coming task TCB exclusively
@@ -65,6 +81,9 @@ pub fn run_tasks() {
             drop(task_inner);
             // release coming task TCB manually
             processor.current = Some(task);
+
+            processor.update_task_first_run_time();
+
             // release processor manually
             drop(processor);
             unsafe {
@@ -108,4 +127,175 @@ pub fn schedule(switched_task_cx_ptr: *mut TaskContext) {
     unsafe {
         __switch(switched_task_cx_ptr, idle_task_cx_ptr);
     }
+
+    kernel_timer_start();
+}
+
+impl Processor {
+    /// Get current without Arc::clone
+    fn current_ref(&self) -> Option<&Arc<TaskControlBlock>> {
+        self.current.as_ref()
+    }
+
+    /// current pid
+    fn current_pid(&self) -> Option<usize> {
+        self.current_ref().map(|tcb| tcb.getpid())
+    }
+
+    /// Start user timer
+    fn user_timer_start(&mut self) {
+        let now_us = get_time_us();
+        trace!(
+            "T[{}] user timer start at {now_us}us",
+            self.current_pid().unwrap()
+        );
+
+        let timer_us = &mut self.user_timer_us;
+
+        assert_eq!(*timer_us, 0, "user timer start without reset.");
+
+        *timer_us = now_us;
+    }
+
+    /// Stop user timer
+    fn user_timer_stop(&mut self) {
+        let now_us = get_time_us();
+        trace!(
+            "T[{}] user timer stop at {now_us}us",
+            self.current_pid().unwrap()
+        );
+
+        let timer_us = &mut self.user_timer_us;
+        let task_timer = &mut self
+            .current
+            .as_ref()
+            .unwrap()
+            .inner_exclusive_access()
+            .infos
+            .running_times
+            .user_time_us;
+
+        assert_ne!(*timer_us, 0, "user timer stop without set.");
+
+        let elapsed_us = now_us - *timer_us;
+        *task_timer += elapsed_us;
+        *timer_us = 0;
+    }
+
+    /// Start kernel timer
+    fn kernel_timer_start(&mut self) {
+        let now_us = get_time_us();
+        trace!(
+            "T[{}] kernel timer start at {now_us}us",
+            self.current_pid().unwrap()
+        );
+
+        let timer_us = &mut self.kernel_timer_us;
+
+        assert_eq!(*timer_us, 0, "kernel timer start without reset.");
+
+        *timer_us = now_us;
+    }
+
+    /// Stop kernel timer
+    fn kernel_timer_stop(&mut self) {
+        let now_us = get_time_us();
+        trace!(
+            "T[{}] kernel timer stop at {now_us}us",
+            self.current_pid().unwrap()
+        );
+
+        let timer_us = &mut self.kernel_timer_us;
+        let task_timer = &mut self
+            .current
+            .as_ref()
+            .unwrap()
+            .inner_exclusive_access()
+            .infos
+            .running_times
+            .kernel_time_us;
+
+        assert_ne!(*timer_us, 0, "kernel timer stop without set.");
+
+        let elapsed_us = now_us - *timer_us;
+        *task_timer += elapsed_us;
+        *timer_us = 0;
+    }
+
+    /// Update task first run time info
+    fn update_task_first_run_time(&mut self) {
+        let mut state = self.current.as_ref().unwrap().inner_exclusive_access();
+        let first_run_time_us = &mut state.infos.running_times.first_run_time_us;
+
+        if *first_run_time_us != 0 {
+            return;
+        }
+
+        let now_us = get_time_us();
+        trace!("T[{}] first run at {now_us}us", self.current_pid().unwrap());
+        *first_run_time_us = now_us;
+
+        drop(state);
+        self.user_timer_start();
+    }
+}
+
+/// Start user timer
+pub fn user_timer_start() {
+    PROCESSOR.exclusive_access().user_timer_start();
+}
+
+/// Stop user timer
+pub fn user_timer_stop() {
+    PROCESSOR.exclusive_access().user_timer_stop();
+}
+
+/// Start kernel timer
+pub fn kernel_timer_start() {
+    PROCESSOR.exclusive_access().kernel_timer_start();
+}
+
+/// Stop kernel timer
+pub fn kernel_timer_stop() {
+    PROCESSOR.exclusive_access().kernel_timer_stop();
+}
+
+/// Get current task info
+pub fn current_task_info() -> (TaskStatus, TaskInfoBlock) {
+    PROCESSOR
+        .exclusive_access()
+        .current_ref()
+        .unwrap()
+        .inner_exclusive_access()
+        .task_info()
+}
+
+/// Update syscall_times
+pub fn update_syscall_times(syscall_id: usize) {
+    PROCESSOR
+        .exclusive_access()
+        .current_ref()
+        .unwrap()
+        .inner_exclusive_access()
+        .update_syscall_times(syscall_id);
+}
+
+/// Create memory map for user space
+pub fn mmap(addr: usize, len: usize, prot: usize) -> isize {
+    PROCESSOR
+        .exclusive_access()
+        .current_ref()
+        .unwrap()
+        .inner_exclusive_access()
+        .mmap(addr, len, prot)
+}
+
+/// Remove memory map for user space
+pub fn munmap(addr: usize, len: usize) -> isize {
+    PROCESSOR
+        .exclusive_access()
+        .current_ref()
+        .unwrap()
+        .inner_exclusive_access()
+        .munmap(addr, len)
 }

@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::fmt::{Debug, Formatter, Result};
 
 const EFS_MAGIC: u32 = 0x3b800001;
-const INODE_DIRECT_COUNT: usize = 28;
+const INODE_DIRECT_COUNT: usize = 27;
 const NAME_LENGTH_LIMIT: usize = 27;
 const INODE_INDIRECT1_COUNT: usize = BLOCK_SZ / 4;
 const INODE_INDIRECT2_COUNT: usize = INODE_INDIRECT1_COUNT * INODE_INDIRECT1_COUNT;
@@ -74,7 +74,11 @@ pub struct DiskInode {
     pub indirect1: u32,
     pub indirect2: u32,
     type_: DiskInodeType,
+
+    links_count: u32,
 }
+
+const _: () = assert!(core::mem::size_of::<DiskInode>() == 128);
 
 impl DiskInode {
     /// indirect1 and indirect2 block are allocated only when they are needed.
@@ -84,6 +88,8 @@ impl DiskInode {
         self.indirect1 = 0;
         self.indirect2 = 0;
         self.type_ = type_;
+
+        self.links_count = 1;
     }
     pub fn is_dir(&self) -> bool {
         self.type_ == DiskInodeType::Directory
@@ -376,6 +382,8 @@ pub struct DirEntry {
     inode_id: u32,
 }
 
+const _: () = assert!(core::mem::size_of::<DirEntry>() == 32);
+
 pub const DIRENT_SZ: usize = 32;
 
 impl DirEntry {
@@ -407,5 +415,28 @@ impl DirEntry {
     /// Get inode number of the entry
     pub fn inode_id(&self) -> u32 {
         self.inode_id
+    }
+}
+
+impl DiskInode {
+    /// Get link count
+    pub fn links_count(&self) -> u32 {
+        self.links_count
+    }
+
+    /// Increase link count
+    pub fn new_link(&mut self) {
+        self.links_count += 1;
+    }
+
+    /// Decrease link count
+    pub fn unlink(&mut self) {
+        self.links_count -= 1;
+    }
+
+    /// Decrease the size of current disk inode
+    pub fn decrease_size_to(&mut self, new_size: u32) {
+        self.size = new_size;
+        // TODO(fh): deallocate space
     }
 }
