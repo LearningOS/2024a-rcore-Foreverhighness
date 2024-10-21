@@ -88,6 +88,8 @@ pub struct DiskInode {
     type_: DiskInodeType,
 }
 
+const _: () = assert!(core::mem::size_of::<DiskInode>() == 128);
+
 impl DiskInode {
     /// Initialize a disk inode, as well as all direct inodes under it
     /// indirect1 and indirect2 block are allocated only when they are needed
@@ -394,6 +396,9 @@ pub struct DirEntry {
     name: [u8; NAME_LENGTH_LIMIT + 1],
     inode_id: u32,
 }
+
+const _: () = assert!(core::mem::size_of::<DirEntry>() == 32);
+
 /// Size of a directory entry
 pub const DIRENT_SZ: usize = 32;
 
