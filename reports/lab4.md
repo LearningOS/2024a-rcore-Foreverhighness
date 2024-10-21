@@ -86,7 +86,7 @@ impl MemorySet {
 
 ## static assertion
 
-TODO(fh): Add suggestion.
+虽然 Rust 中并没有自带的 static_assert 函数，但是可以通过小技巧实现等价的效果。
 
 ```rust
 pub struct DiskInode {
@@ -102,7 +102,7 @@ const _: () = assert!(core::mem::size_of::<DiskInode>() == 128);
 
 ## Pointer to reference conversion
 
-[Pointer to reference conversion](https://doc.rust-lang.org/std/ptr/index.html#pointer-to-reference-conversion)
+文档中可以添加和 unsafe 相关的的这个文档链接 [Pointer to reference conversion](https://doc.rust-lang.org/std/ptr/index.html#pointer-to-reference-conversion).
 
 ```rust
 impl BlockCache {
