@@ -459,7 +459,7 @@ impl DiskInode {
     }
 
     /// Decrease the size of current disk inode
-    pub fn decrease_size_to(&mut self, new_size: u32, _block_device: &Arc<dyn BlockDevice>) {
+    pub fn decrease_size_to(&mut self, new_size: u32) {
         self.size = new_size;
         // TODO(fh): deallocate space
     }
