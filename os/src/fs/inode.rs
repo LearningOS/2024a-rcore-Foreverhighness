@@ -177,3 +177,16 @@ impl File for OSInode {
         }
     }
 }
+
+/// Unlink a file
+pub fn unlink_at(path: &str) -> isize {
+    let Some(file) = ROOT_INODE.remove(path) else {
+        return -1;
+    };
+
+    if file.links_count() == 0 {
+        file.free();
+    }
+
+    0
+}

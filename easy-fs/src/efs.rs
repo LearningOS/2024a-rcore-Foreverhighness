@@ -157,3 +157,11 @@ impl EasyFileSystem {
         )
     }
 }
+
+impl EasyFileSystem {
+    /// Deallocate a inode
+    pub fn dealloc_inode(&mut self, inode_id: u32) {
+        self.inode_bitmap
+            .dealloc(&self.block_device, inode_id as usize);
+    }
+}

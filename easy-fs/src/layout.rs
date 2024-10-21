@@ -447,4 +447,15 @@ impl DiskInode {
     pub fn links_count(&self) -> u32 {
         self.links_count
     }
+
+    /// Decrease link count
+    pub fn unlink(&mut self) {
+        self.links_count -= 1;
+    }
+
+    /// Decrease the size of current disk inode
+    pub fn decrease_size_to(&mut self, new_size: u32, _block_device: &Arc<dyn BlockDevice>) {
+        self.size = new_size;
+        // TODO(fh): deallocate space
+    }
 }
