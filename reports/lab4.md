@@ -121,3 +121,27 @@ impl BlockCache {
     }
 }
 ```
+
+## `Weak` can be construct without arguments
+
+使用 `Option` 来包裹 `Weak` 是一个相当经典的误区了。
+查看 [`Weak`](https://doc.rust-lang.org/std/sync/struct.Weak.html) 文档可以发现 `Weak::new()` 是不需要参数的，并且 `Weak` 也可以直接赋值。
+
+```rust
+pub struct PipeRingBuffer {
+    ...
+    write_end: Weak<Pipe>,
+}
+impl PipeRingBuffer {
+    pub fn new() -> Self {
+        Self {
+            ...,
+            write_end: Weak::new(),
+        }
+    }
+    pub fn set_write_end(&mut self, write_end: &Arc<Pipe>) {
+        self.write_end = Arc::downgrade(write_end);
+    }
+}
+```
+

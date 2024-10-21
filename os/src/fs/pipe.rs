@@ -45,7 +45,7 @@ pub struct PipeRingBuffer {
     head: usize,
     tail: usize,
     status: RingBufferStatus,
-    write_end: Option<Weak<Pipe>>,
+    write_end: Weak<Pipe>,
 }
 
 impl PipeRingBuffer {
@@ -55,11 +55,11 @@ impl PipeRingBuffer {
             head: 0,
             tail: 0,
             status: RingBufferStatus::Empty,
-            write_end: None,
+            write_end: Weak::new(),
         }
     }
     pub fn set_write_end(&mut self, write_end: &Arc<Pipe>) {
-        self.write_end = Some(Arc::downgrade(write_end));
+        self.write_end = Arc::downgrade(write_end);
     }
     pub fn write_byte(&mut self, byte: u8) {
         self.status = RingBufferStatus::Normal;
@@ -95,7 +95,7 @@ impl PipeRingBuffer {
         }
     }
     pub fn all_write_ends_closed(&self) -> bool {
-        self.write_end.as_ref().unwrap().upgrade().is_none()
+        self.write_end.upgrade().is_none()
     }
 }
 
