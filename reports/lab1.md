@@ -129,7 +129,9 @@ OS 课程中与汇编打交道是不得不品尝的一环，但是现在已经�
 
 我个人认为 `__switch` 非常适合写成 `naked function`.  
 这样还能推出 `__switch` 的返回值是 `never type`, 即 `fn __switch(/* args */) -> !`.  
-然而非常 tricky 的一点是，尽管 `__switch` 是永不返回的，但是 `__switch` 之后的代码依然能够被执行到。
+然而非常 tricky 的一点是，尽管 `__switch` 是永不返回的，但是 `__switch` 之后的代码依然能够被执行到。  
+而也正是由于这点，我们并不能将 `__switch` 标记为 `__switch(/* args */) -> !`, 因为在 Rust 文档中明确提到这是 [`undefined behavior`][5].
+> A ! value must never exist.
 
 `trap.S` 中的两个函数因为 Rust 代码里并没有直接调用的地方，我认为使用纯汇编就足够了。
 
@@ -140,3 +142,4 @@ OS 课程中与汇编打交道是不得不品尝的一环，但是现在已经�
 [2]: https://rust-lang.github.io/rfcs/2972-constrained-naked.html
 [3]: https://rust-lang.github.io/rfcs/2972-constrained-naked.html#remove-naked-functions
 [4]: https://rust-lang.github.io/rfcs/1548-global-asm.html#alternatives
+[5]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html#invalid-values
