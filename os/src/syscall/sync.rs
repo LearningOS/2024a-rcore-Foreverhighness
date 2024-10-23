@@ -1,5 +1,8 @@
+use crate::sync::RequestResult::{Deadlock, Success, Wait};
 use crate::sync::{add_resource, Condvar, Mutex, MutexBlocking, MutexSpin, Semaphore};
-use crate::task::{block_current_and_run_next, current_process, current_task};
+use crate::task::{
+    block_current_and_run_next, current_process, current_task, suspend_current_and_run_next,
+};
 use crate::timer::{add_timer, get_time_ms};
 use alloc::sync::Arc;
 /// sleep syscall
@@ -80,8 +83,12 @@ pub fn sys_mutex_lock(mutex_id: usize) -> isize {
         .as_ref()
         .unwrap()
         .tid;
-    if let Some(crate::sync::RequestResult::Deadlock) = crate::sync::acquire(tid, mutex_id, 1) {
-        return -0xdead;
+    loop {
+        match crate::sync::acquire(tid, mutex_id, 1) {
+            Some(Deadlock) => return -0xdead,
+            Some(Wait) => suspend_current_and_run_next(),
+            Some(Success) | None => break,
+        }
     }
 
     let process = current_process();
@@ -159,7 +166,7 @@ pub fn sys_semaphore_create(res_count: usize) -> isize {
 }
 /// semaphore up syscall
 pub fn sys_semaphore_up(sem_id: usize) -> isize {
-    trace!(
+    debug!(
         "kernel:pid[{}] tid[{}] sys_semaphore_up",
         current_task().unwrap().process.upgrade().unwrap().getpid(),
         current_task()
@@ -188,7 +195,7 @@ pub fn sys_semaphore_up(sem_id: usize) -> isize {
 }
 /// semaphore down syscall
 pub fn sys_semaphore_down(sem_id: usize) -> isize {
-    trace!(
+    debug!(
         "kernel:pid[{}] tid[{}] sys_semaphore_down",
         current_task().unwrap().process.upgrade().unwrap().getpid(),
         current_task()
@@ -206,14 +213,20 @@ pub fn sys_semaphore_down(sem_id: usize) -> isize {
         .as_ref()
         .unwrap()
         .tid;
-    if let Some(crate::sync::RequestResult::Deadlock) = crate::sync::acquire(tid, sem_id, 1) {
-        return -0xdead;
+    crate::sync::record(tid, sem_id, 1);
+    loop {
+        match crate::sync::acquire(tid, sem_id, 1) {
+            Some(Deadlock) => return -0xdead,
+            Some(Wait) => suspend_current_and_run_next(),
+            Some(Success) | None => break,
+        }
     }
     let process = current_process();
     let process_inner = process.inner_exclusive_access();
     let sem = Arc::clone(process_inner.semaphore_list[sem_id].as_ref().unwrap());
     drop(process_inner);
     sem.down();
+
     0
 }
 /// condvar create syscall

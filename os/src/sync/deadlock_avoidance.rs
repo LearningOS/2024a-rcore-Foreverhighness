@@ -30,6 +30,13 @@ pub fn add_resource(resource: ResourceIdentifier, n: NumberOfResource) {
     }
 }
 
+/// Record
+pub fn record(task: TaskIdentifier, resource: ResourceIdentifier, n: NumberOfResource) {
+    if let Some(algorithm) = DEADLOCK_DETECT_ENABLED.exclusive_access().as_mut() {
+        algorithm.record(task, resource, n);
+    }
+}
+
 /// Handle request
 pub fn acquire(
     task: TaskIdentifier,
@@ -38,18 +45,27 @@ pub fn acquire(
 ) -> Option<RequestResult> {
     let mut algorithm = DEADLOCK_DETECT_ENABLED.exclusive_access();
     let algorithm = algorithm.as_mut()?;
-    Some(algorithm.acquire(task, resource, n))
+
+    debug!("acquire(task: {task}, res: {resource}, n: {n})");
+    debug!("before: \n{algorithm:?}");
+    let result = algorithm.acquire(task, resource, n);
+    debug!("after: {result:?}\n{algorithm:?}");
+
+    Some(result)
 }
 
 /// Release resource
 pub fn release(task: TaskIdentifier, resource: ResourceIdentifier, n: NumberOfResource) {
     if let Some(algorithm) = DEADLOCK_DETECT_ENABLED.exclusive_access().as_mut() {
+        debug!("release(task: {task}, res: {resource}, n: {n})");
+        debug!("before: \n{algorithm:?}");
         algorithm.release(task, resource, n);
+        debug!("after: \n{algorithm:?}");
     }
 }
 
 /// Banker's Algorithm Request Result
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum RequestResult {
     /// Potential deadlock
     Deadlock,
@@ -60,18 +76,28 @@ pub enum RequestResult {
 }
 
 mod bankers_algorithm {
+    use core::fmt::Debug;
+
     use super::{NumberOfResource, RequestResult, ResourceIdentifier, TaskIdentifier};
     use alloc::collections::btree_map::BTreeMap;
 
-    #[derive(Debug, Default)]
+    #[derive(Default)]
     struct TaskResourcesState {
-        // max: NumberOfResource,
         allocation: NumberOfResource,
         need: NumberOfResource,
     }
 
+    impl Debug for TaskResourcesState {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            f.write_fmt(format_args!(
+                "[alloc: {:?}, need: {:?}]",
+                self.allocation, self.need
+            ))
+        }
+    }
+
     /// Implementation of banker's algorithm
-    #[derive(Debug, Default)]
+    #[derive(Default)]
     pub struct BankersAlgorithm {
         /// Available map
         available: BTreeMap<ResourceIdentifier, NumberOfResource>,
@@ -79,27 +105,35 @@ mod bankers_algorithm {
         task_state: BTreeMap<TaskIdentifier, BTreeMap<ResourceIdentifier, TaskResourcesState>>,
     }
 
-    fn default_res_state_from_available(
-        available: &BTreeMap<ResourceIdentifier, NumberOfResource>,
-    ) -> BTreeMap<ResourceIdentifier, TaskResourcesState> {
-        available
-            .iter()
-            .map(|(&res, &need)| {
-                (
-                    res,
-                    TaskResourcesState {
-                        allocation: 0,
-                        need,
-                    },
-                )
-            })
-            .collect()
+    impl Debug for BankersAlgorithm {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            f.write_fmt(format_args!("Available: {:?}\n", self.available))?;
+            for (&task, res_state) in &self.task_state {
+                f.write_fmt(format_args!("T{task}: {res_state:?}\n"))?;
+            }
+            Ok(())
+        }
     }
 
     impl BankersAlgorithm {
         /// Add resource
         pub fn add_resource(&mut self, resource: ResourceIdentifier, n: NumberOfResource) {
             *self.available.entry(resource).or_default() += n;
+        }
+
+        /// record
+        pub fn record(
+            &mut self,
+            task: TaskIdentifier,
+            resource: ResourceIdentifier,
+            n: NumberOfResource,
+        ) {
+            self.task_state
+                .entry(task)
+                .or_default()
+                .entry(resource)
+                .or_default()
+                .need += n;
         }
 
         /// Handle request
@@ -109,10 +143,7 @@ mod bankers_algorithm {
             resource: ResourceIdentifier,
             n: NumberOfResource,
         ) -> RequestResult {
-            let task_state = &self
-                .task_state
-                .entry(task)
-                .or_insert_with(|| default_res_state_from_available(&self.available))[&resource];
+            let task_state = &self.task_state[&task][&resource];
             let available = self.available[&resource];
 
             // 1. 如果 Request[i,j] ≤ Need[i,j]，则转步骤2；否则出错，因为线程所需的资源数已超过它所宣布的最大值。
