@@ -13,11 +13,13 @@ type TaskIdentifier = usize;
 
 /// Enable deadlock detect
 pub fn enable() {
+    debug!("Enable deadlock detect enabled");
     *DEADLOCK_DETECT_ENABLED.exclusive_access() = Some(Algorithm::default());
 }
 
 /// Disable deadlock detect
 pub fn disable() {
+    debug!("Disable deadlock detect.");
     DEADLOCK_DETECT_ENABLED.exclusive_access().take();
 }
 
@@ -29,21 +31,28 @@ pub fn add_resource(resource: ResourceIdentifier, n: NumberOfResource) {
 }
 
 /// Handle request
-pub fn request(
+pub fn acquire(
     task: TaskIdentifier,
-    res: ResourceIdentifier,
+    resource: ResourceIdentifier,
     n: NumberOfResource,
 ) -> Option<RequestResult> {
     let mut algorithm = DEADLOCK_DETECT_ENABLED.exclusive_access();
     let algorithm = algorithm.as_mut()?;
-    Some(algorithm.request(task, res, n))
+    Some(algorithm.acquire(task, resource, n))
+}
+
+/// Release resource
+pub fn release(task: TaskIdentifier, resource: ResourceIdentifier, n: NumberOfResource) {
+    if let Some(algorithm) = DEADLOCK_DETECT_ENABLED.exclusive_access().as_mut() {
+        algorithm.release(task, resource, n);
+    }
 }
 
 /// Banker's Algorithm Request Result
 #[derive(Debug, PartialEq)]
 pub enum RequestResult {
     /// Potential deadlock
-    Error,
+    Deadlock,
     /// Need wait
     Wait,
     /// Allocate resources
@@ -92,12 +101,13 @@ mod bankers_algorithm {
         pub fn add_resource(&mut self, resource: ResourceIdentifier, n: NumberOfResource) {
             *self.available.entry(resource).or_default() += n;
         }
+
         /// Handle request
-        pub fn request(
+        pub fn acquire(
             &mut self,
             task: TaskIdentifier,
             resource: ResourceIdentifier,
-            request: NumberOfResource,
+            n: NumberOfResource,
         ) -> RequestResult {
             let task_state = &self
                 .task_state
@@ -106,32 +116,42 @@ mod bankers_algorithm {
             let available = self.available[&resource];
 
             // 1. 如果 Request[i,j] ≤ Need[i,j]，则转步骤2；否则出错，因为线程所需的资源数已超过它所宣布的最大值。
-            if request > task_state.need {
-                return RequestResult::Error;
+            if n > task_state.need {
+                return RequestResult::Deadlock;
             }
 
             // 2. 如果 Request[i,j] ≤ Available[j]，则转步骤3；否则，表示尚无足够资源，线程thr[i]进入等待状态。
-            if request > available {
+            if n > available {
                 return RequestResult::Wait;
             }
 
             // 3. 操作系统试着把资源分配给线程thr[i]，并修改下面数据结构中的值：
-            self.alloc(task, resource, request);
+            self.alloc(task, resource, n);
 
             // 4. 操作系统执行安全性检查算法，检查此次资源分配后系统是否处于安全状态。若安全，则实际将资源分配给线程thr[i]；否则不进行资源分配，让线程thr[i]等待。
             if !self.security_check() {
-                self.dealloc(task, resource, request);
+                self.dealloc(task, resource, n);
                 return RequestResult::Wait;
             }
 
             RequestResult::Success
         }
 
+        /// Release resource
+        pub fn release(
+            &mut self,
+            task: TaskIdentifier,
+            resource: ResourceIdentifier,
+            n: NumberOfResource,
+        ) {
+            self.dealloc(task, resource, n);
+        }
+
         fn alloc(
             &mut self,
             task: TaskIdentifier,
             resource: ResourceIdentifier,
-            request: NumberOfResource,
+            n: NumberOfResource,
         ) {
             let available = self.available.get_mut(&resource).unwrap();
             let task = self
@@ -141,18 +161,18 @@ mod bankers_algorithm {
                 .get_mut(&resource)
                 .unwrap();
             // Available[j] = Available[j] - Request[i,j];
-            *available -= request;
+            *available -= n;
             // Allocation[i,j] = Allocation[i,j] + Request[i,j];
-            task.allocation += request;
+            task.allocation += n;
             // Need[i,j] = Need[i,j] - Request[i,j];
-            task.need -= request;
+            task.need -= n;
         }
 
         fn dealloc(
             &mut self,
             task: TaskIdentifier,
             resource: ResourceIdentifier,
-            request: NumberOfResource,
+            n: NumberOfResource,
         ) {
             let available = self.available.get_mut(&resource).unwrap();
             let task = self
@@ -161,9 +181,9 @@ mod bankers_algorithm {
                 .unwrap()
                 .get_mut(&resource)
                 .unwrap();
-            *available += request;
-            task.allocation -= request;
-            task.need += request;
+            *available += n;
+            task.allocation -= n;
+            task.need += n;
         }
 
         fn security_check(&self) -> bool {

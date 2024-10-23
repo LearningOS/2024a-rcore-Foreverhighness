@@ -11,4 +11,4 @@ pub use semaphore::Semaphore;
 pub use up::UPSafeCell;
 
 mod deadlock_avoidance;
-pub use deadlock_avoidance::{add_resource, disable, enable, request, RequestResult};
+pub use deadlock_avoidance::{acquire, add_resource, disable, enable, release, RequestResult};
