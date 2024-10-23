@@ -1,6 +1,8 @@
 # 吐槽时间
 
-## TODO
+## Reduce Construct of Arc
+
+Arc 如果不需要所有权的话完全是可以传引用的。
 
 ```rust
 impl TaskUserRes {
@@ -26,8 +28,9 @@ impl TaskUserRes {
 
 ## non-canonical implementation of `partial_cmp` on an `Ord` type 
 
-[`non_canonical_partial_ord_impl`](https://rust-lang.github.io/rust-clippy/master/index.html#non_canonical_partial_ord_impl)
-[`min-heap`](https://doc.rust-lang.org/std/collections/struct.BinaryHeap.html#min-heap)
+`TimeCondVar` 的 `Ord` 实现的不是很地道。  
+实际上在 `BinaryHeap` 的官方文档里就有[`最小堆`](https://doc.rust-lang.org/std/collections/struct.BinaryHeap.html#min-heap)的推荐写法。  
+如果开启了 `clippy` 的话也会报 [`non_canonical_partial_ord_impl`](https://rust-lang.github.io/rust-clippy/master/index.html#non_canonical_partial_ord_impl) lint.
 
 ```rust
 impl PartialOrd for TimerCondVar {
