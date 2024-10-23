@@ -90,6 +90,7 @@ pub fn exit_current_and_run_next(exit_code: i32) {
 
     // Move the task to stop-wait status, to avoid kernel stack from being freed
     if tid == 0 {
+        crate::sync::disable(process.getpid());
         add_stopping_task(task);
     } else {
         drop(task);

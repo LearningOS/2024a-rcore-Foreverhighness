@@ -1,10 +1,15 @@
 //! Deadlock avoidance algorithms
 
+use alloc::collections::btree_map::BTreeMap;
+
+use crate::task::current_task;
+
 use super::UPSafeCell;
 
 type Algorithm = bankers_algorithm::BankersAlgorithm;
 
-static DEADLOCK_DETECT_ENABLED: UPSafeCell<Option<Algorithm>> = unsafe { UPSafeCell::new(None) };
+static DEADLOCK_DETECT_ENABLED: UPSafeCell<BTreeMap<usize, Algorithm>> =
+    unsafe { UPSafeCell::new(BTreeMap::new()) };
 
 type ResourceIdentifier = usize;
 type NumberOfResource = usize;
@@ -13,26 +18,32 @@ type TaskIdentifier = usize;
 
 /// Enable deadlock detect
 pub fn enable() {
+    let pid = current_task().unwrap().process.upgrade().unwrap().getpid();
     trace!("Enable deadlock detect.");
-    *DEADLOCK_DETECT_ENABLED.exclusive_access() = Some(Algorithm::default());
+    let old = DEADLOCK_DETECT_ENABLED
+        .exclusive_access()
+        .insert(pid, Algorithm::default());
+    assert!(old.is_none());
 }
 
 /// Disable deadlock detect
-pub fn disable() {
+pub fn disable(pid: usize) {
     trace!("Disable deadlock detect.");
-    DEADLOCK_DETECT_ENABLED.exclusive_access().take();
+    DEADLOCK_DETECT_ENABLED.exclusive_access().remove(&pid);
 }
 
 /// Add resource
 pub fn add_resource(resource: ResourceIdentifier, n: NumberOfResource) {
-    if let Some(algorithm) = DEADLOCK_DETECT_ENABLED.exclusive_access().as_mut() {
+    let pid = current_task().unwrap().process.upgrade().unwrap().getpid();
+    if let Some(algorithm) = DEADLOCK_DETECT_ENABLED.exclusive_access().get_mut(&pid) {
         algorithm.add_resource(resource, n);
     }
 }
 
 /// Acquire resource
 pub fn acquire(task: TaskIdentifier, resource: ResourceIdentifier, n: NumberOfResource) {
-    if let Some(algorithm) = DEADLOCK_DETECT_ENABLED.exclusive_access().as_mut() {
+    let pid = current_task().unwrap().process.upgrade().unwrap().getpid();
+    if let Some(algorithm) = DEADLOCK_DETECT_ENABLED.exclusive_access().get_mut(&pid) {
         trace!("acquire(task: {task}, res: {resource}, n: {n})");
         trace!("before: \n{algorithm:?}");
         algorithm.acquire(task, resource, n);
@@ -42,7 +53,8 @@ pub fn acquire(task: TaskIdentifier, resource: ResourceIdentifier, n: NumberOfRe
 
 /// Release resource
 pub fn release(task: TaskIdentifier, resource: ResourceIdentifier, n: NumberOfResource) {
-    if let Some(algorithm) = DEADLOCK_DETECT_ENABLED.exclusive_access().as_mut() {
+    let pid = current_task().unwrap().process.upgrade().unwrap().getpid();
+    if let Some(algorithm) = DEADLOCK_DETECT_ENABLED.exclusive_access().get_mut(&pid) {
         trace!("release(task: {task}, res: {resource}, n: {n})");
         trace!("before: \n{algorithm:?}");
         algorithm.release(task, resource, n);
@@ -56,9 +68,12 @@ pub fn request(
     resource: ResourceIdentifier,
     n: NumberOfResource,
 ) -> Option<RequestResult> {
-    let mut algorithm = DEADLOCK_DETECT_ENABLED.exclusive_access();
-    let algorithm = algorithm.as_mut()?;
-    Some(algorithm.request(task, resource, n))
+    let pid = current_task().unwrap().process.upgrade().unwrap().getpid();
+    if let Some(algorithm) = DEADLOCK_DETECT_ENABLED.exclusive_access().get_mut(&pid) {
+        Some(algorithm.request(task, resource, n))
+    } else {
+        None
+    }
 }
 
 /// Banker's Algorithm Request Result

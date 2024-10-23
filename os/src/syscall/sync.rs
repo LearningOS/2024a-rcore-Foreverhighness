@@ -314,8 +314,9 @@ pub fn sys_enable_deadlock_detect(enabled: usize) -> isize {
             .tid
     );
 
+    let pid = current_task().unwrap().process.upgrade().unwrap().getpid();
     match enabled {
-        0 => crate::sync::disable(),
+        0 => crate::sync::disable(pid),
         1 => crate::sync::enable(),
         _ => return -1,
     }
