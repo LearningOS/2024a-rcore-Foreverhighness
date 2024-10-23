@@ -6,6 +6,7 @@ use crate::{
         current_process, current_task, current_user_token, exit_current_and_run_next, pid2process,
         suspend_current_and_run_next, SignalFlags, TaskStatus,
     },
+    timer::{get_time_us, MICRO_PER_SEC},
 };
 use alloc::{string::String, sync::Arc, vec::Vec};
 
@@ -162,12 +163,19 @@ pub fn sys_kill(pid: usize, signal: u32) -> isize {
 /// YOUR JOB: get time with second and microsecond
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
-pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
+pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
     trace!(
-        "kernel:pid[{}] sys_get_time NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_get_time(ts: 0x{ts:X?})",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
-    -1
+    let now_us = get_time_us();
+    unsafe {
+        crate::util::UserSpacePtr::from(ts).write(TimeVal {
+            sec: now_us / MICRO_PER_SEC,
+            usec: now_us % MICRO_PER_SEC,
+        });
+    }
+    0
 }
 
 /// task_info syscall
