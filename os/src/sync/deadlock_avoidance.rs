@@ -13,13 +13,13 @@ type TaskIdentifier = usize;
 
 /// Enable deadlock detect
 pub fn enable() {
-    debug!("Enable deadlock detect enabled");
+    trace!("Enable deadlock detect.");
     *DEADLOCK_DETECT_ENABLED.exclusive_access() = Some(Algorithm::default());
 }
 
 /// Disable deadlock detect
 pub fn disable() {
-    debug!("Disable deadlock detect.");
+    trace!("Disable deadlock detect.");
     DEADLOCK_DETECT_ENABLED.exclusive_access().take();
 }
 
@@ -30,38 +30,35 @@ pub fn add_resource(resource: ResourceIdentifier, n: NumberOfResource) {
     }
 }
 
-/// Record
-pub fn record(task: TaskIdentifier, resource: ResourceIdentifier, n: NumberOfResource) {
+/// Acquire resource
+pub fn acquire(task: TaskIdentifier, resource: ResourceIdentifier, n: NumberOfResource) {
     if let Some(algorithm) = DEADLOCK_DETECT_ENABLED.exclusive_access().as_mut() {
-        algorithm.record(task, resource, n);
+        trace!("acquire(task: {task}, res: {resource}, n: {n})");
+        trace!("before: \n{algorithm:?}");
+        algorithm.acquire(task, resource, n);
+        trace!("after: \n{algorithm:?}");
+    }
+}
+
+/// Release resource
+pub fn release(task: TaskIdentifier, resource: ResourceIdentifier, n: NumberOfResource) {
+    if let Some(algorithm) = DEADLOCK_DETECT_ENABLED.exclusive_access().as_mut() {
+        trace!("release(task: {task}, res: {resource}, n: {n})");
+        trace!("before: \n{algorithm:?}");
+        algorithm.release(task, resource, n);
+        trace!("after: \n{algorithm:?}");
     }
 }
 
 /// Handle request
-pub fn acquire(
+pub fn request(
     task: TaskIdentifier,
     resource: ResourceIdentifier,
     n: NumberOfResource,
 ) -> Option<RequestResult> {
     let mut algorithm = DEADLOCK_DETECT_ENABLED.exclusive_access();
     let algorithm = algorithm.as_mut()?;
-
-    debug!("acquire(task: {task}, res: {resource}, n: {n})");
-    debug!("before: \n{algorithm:?}");
-    let result = algorithm.acquire(task, resource, n);
-    debug!("after: {result:?}\n{algorithm:?}");
-
-    Some(result)
-}
-
-/// Release resource
-pub fn release(task: TaskIdentifier, resource: ResourceIdentifier, n: NumberOfResource) {
-    if let Some(algorithm) = DEADLOCK_DETECT_ENABLED.exclusive_access().as_mut() {
-        debug!("release(task: {task}, res: {resource}, n: {n})");
-        debug!("before: \n{algorithm:?}");
-        algorithm.release(task, resource, n);
-        debug!("after: \n{algorithm:?}");
-    }
+    Some(algorithm.request(task, resource, n))
 }
 
 /// Banker's Algorithm Request Result
@@ -122,7 +119,7 @@ mod bankers_algorithm {
         }
 
         /// record
-        pub fn record(
+        fn record(
             &mut self,
             task: TaskIdentifier,
             resource: ResourceIdentifier,
@@ -137,48 +134,22 @@ mod bankers_algorithm {
         }
 
         /// Handle request
-        pub fn acquire(
+        pub fn request(
             &mut self,
             task: TaskIdentifier,
             resource: ResourceIdentifier,
             n: NumberOfResource,
         ) -> RequestResult {
-            let task_state = &self.task_state[&task][&resource];
-            let available = self.available[&resource];
+            self.record(task, resource, n);
 
-            // 1. 如果 Request[i,j] ≤ Need[i,j]，则转步骤2；否则出错，因为线程所需的资源数已超过它所宣布的最大值。
-            if n > task_state.need {
+            if !self.security_check() {
                 return RequestResult::Deadlock;
             }
-
-            // 2. 如果 Request[i,j] ≤ Available[j]，则转步骤3；否则，表示尚无足够资源，线程thr[i]进入等待状态。
-            if n > available {
-                return RequestResult::Wait;
-            }
-
-            // 3. 操作系统试着把资源分配给线程thr[i]，并修改下面数据结构中的值：
-            self.alloc(task, resource, n);
-
-            // 4. 操作系统执行安全性检查算法，检查此次资源分配后系统是否处于安全状态。若安全，则实际将资源分配给线程thr[i]；否则不进行资源分配，让线程thr[i]等待。
-            if !self.security_check() {
-                self.dealloc(task, resource, n);
-                return RequestResult::Wait;
-            }
-
             RequestResult::Success
         }
 
-        /// Release resource
-        pub fn release(
-            &mut self,
-            task: TaskIdentifier,
-            resource: ResourceIdentifier,
-            n: NumberOfResource,
-        ) {
-            self.dealloc(task, resource, n);
-        }
-
-        fn alloc(
+        /// Acquire resource
+        pub fn acquire(
             &mut self,
             task: TaskIdentifier,
             resource: ResourceIdentifier,
@@ -191,6 +162,8 @@ mod bankers_algorithm {
                 .unwrap()
                 .get_mut(&resource)
                 .unwrap();
+            assert!(*available >= n);
+            assert!(task.need >= n);
             // Available[j] = Available[j] - Request[i,j];
             *available -= n;
             // Allocation[i,j] = Allocation[i,j] + Request[i,j];
@@ -199,7 +172,8 @@ mod bankers_algorithm {
             task.need -= n;
         }
 
-        fn dealloc(
+        /// Release resource
+        pub fn release(
             &mut self,
             task: TaskIdentifier,
             resource: ResourceIdentifier,
@@ -214,7 +188,6 @@ mod bankers_algorithm {
                 .unwrap();
             *available += n;
             task.allocation -= n;
-            task.need += n;
         }
 
         fn security_check(&self) -> bool {
@@ -234,29 +207,15 @@ mod bankers_algorithm {
             loop {
                 // 2. 从线程集合中找到一个能满足下述条件的线程
                 // Finish[i] == false; Need[i,j] <= Work[j];
-                // let i = for (task, res_state) in &self.task_state {
-                //     for (res, state) in res_state {
-                //         if !finish[task] && state.need <= work[res] {
-                //             break Some((*task, *res, state.allocation));
-                //         }
-                //     }
-                // };
-                if let Some((task, res, allocated)) =
-                    self.task_state.iter().find_map(|(task, res_state)| {
-                        (!finish[task])
-                            .then(|| {
-                                res_state
-                                    .iter()
-                                    .find(|&(res, state)| state.need <= work[res])
-                                    .map(|(res, state)| (task, res, state.allocation))
-                            })
-                            .flatten()
-                    })
-                {
+                if let Some((task, res_state)) = self.task_state.iter().find(|(task, res_state)| {
+                    !finish[task] && res_state.iter().all(|(res, state)| state.need <= work[res])
+                }) {
                     // 若找到，执行步骤3，否则，执行步骤4。
                     // 3. 当线程thr[i]获得资源后，可顺利执行，直至完成，并释放出分配给它的资源，故应执行:
                     // Work[j] = Work[j] + Allocation[i,j];
-                    *work.get_mut(res).unwrap() += allocated;
+                    for (res, state) in res_state {
+                        *work.get_mut(res).unwrap() += state.allocation;
+                    }
 
                     // Finish[i] = true;
                     *finish.get_mut(task).unwrap() = true;

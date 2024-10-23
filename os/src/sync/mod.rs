@@ -12,5 +12,5 @@ pub use up::UPSafeCell;
 
 mod deadlock_avoidance;
 pub use deadlock_avoidance::{
-    acquire, add_resource, disable, enable, record, release, RequestResult,
+    acquire, add_resource, disable, enable, release, request, RequestResult,
 };
